@@ -1,0 +1,2 @@
+# Backend tests need the same packages as the app plus aiosqlite for in-memory tests
+aiosqlite>=0.20.0

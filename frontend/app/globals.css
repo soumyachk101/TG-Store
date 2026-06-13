@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  height: 100%;
+  background: theme('colors.bg.DEFAULT');
+  color: theme('colors.ink.DEFAULT');
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: theme('colors.bg.DEFAULT'); }
+::-webkit-scrollbar-thumb { background: theme('colors.line.strong'); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: theme('colors.line.strong'); filter: brightness(1.2); }
+
+/* Subtle focus ring that doesn't shout */
+*:focus-visible {
+  outline: 2px solid theme('colors.accent.DEFAULT');
+  outline-offset: 2px;
+  border-radius: 4px;
+}
