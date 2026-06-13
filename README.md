@@ -98,28 +98,28 @@ flowchart LR
     subgraph Backend["FastAPI · Python 3.12"]
         Auth["routers/auth.py<br/>POST /auth/login"]:::api
         Files["routers/files.py<br/>upload · list · stream · patch · delete"]:::api
-        TG["services/telegram.py<br/>3× exp-backoff retry"]:::api
+        TG["services/telegram.py<br/>3x exp-backoff retry"]:::api
     end
     DB[("PostgreSQL 16<br/>folders · files · soft-delete")]:::store
-    TG_API(("Telegram Bot API<br/>+ private channel")):::ext
+    TG_API(("Telegram Bot API<br/>private channel CDN")):::ext
 
     User -->|HTTPS| MW
     MW -->|unauth| Dash
     MW -->|authed| Dash
     Dash -->|POST /auth/login| Auth
     Auth -->|HS256 JWT| Dash
-    Dash ==>|"① multipart upload<br/>② Authorization: Bearer JWT"| Files
-    Files -.->|"③ size cap &lt; 2 GB"| Files
-    Files ==>|"④ sendDocument<br/>caption = filename"| TG
-    TG ==>|"⑤ file_id · message_id"| TG_API
-    TG_API -.->|"⑥ bytes stored"| TG_API
-    Files <==|"⑦ file_id"| TG
-    Files <-->|"⑧ INSERT files row"| DB
-    Files ==>|"⑨ 201 FileResponse"| Dash
-    Dash -->|"⑩ invalidate<br/>['files','stats']"| User
+    Dash -->|"1. multipart upload, Bearer JWT"| Files
+    Files -->|"2. size cap less than 2 GB"| Files
+    Files -->|"3. sendDocument, caption=filename"| TG
+    TG -->|"4. POST bot TOKEN sendDocument"| TG_API
+    TG_API -->|"5. bytes stored in CDN"| TG_API
+    TG -->|"6. file_id, message_id"| Files
+    Files <-->|"7. INSERT files row"| DB
+    Files -->|"8. 201 FileResponse"| Dash
+    Dash -->|"9. invalidate files, stats"| User
 
-    linkStyle 0,1,2,3,4,5,6,7,8,9,10,11,12 stroke:#60a5fa,stroke-width:1.5px;
-    linkStyle 5,6,7,8,9 stroke:#22c55e,stroke-width:2.5px,stroke-dasharray:10 4,animation:fast;
+    linkStyle 0,1,2,3,4 stroke:#60a5fa,stroke-width:1.5px;
+    linkStyle 5,6,7,8,9 stroke:#22c55e,stroke-width:2.5px,stroke-dasharray:10 4;
 ```
 
 > 🔵 = control plane (auth, navigation) &nbsp;·&nbsp; 🟢 = data plane (the actual bytes)
