@@ -47,9 +47,12 @@
 
 ## 💡 The pitch
 
-Telegram gives every bot a *free* CDN with multi-GB file support and a global edge. TGStore is
-the thin, opinionated layer that turns it into a Dropbox-class experience for a single user —
-with a polished Next.js dashboard, a FastAPI backend, and a Postgres index of what you have.
+> **Why pay AWS for storage when a Telegram bot will hold your files for free?**
+
+Telegram gives every bot a globally-cached CDN with multi-GB file support and no
+egress fees. **TGStore** is the thin, opinionated layer that turns a private
+Telegram channel into a *Dropbox-class* personal cloud — for one person, on
+hardware you control, with code you can read in one sitting.
 
 ```text
   ┌──────────────┐    multipart     ┌────────────┐  sendDocument   ┌──────────────────┐
@@ -64,12 +67,39 @@ with a polished Next.js dashboard, a FastAPI backend, and a Postgres index of wh
                                     └──────────────┘
 ```
 
-- **Zero storage cost** — Telegram's CDN is the bucket; you only pay for metadata in Postgres.
-- **Bot token never leaks** — the raw `https://api.telegram.org/file/bot<TOKEN>/…` URL is regenerated
-  server-side on every request and *always* proxied through `/stream`.
-- **Single-user, self-host** — no teams, no sharing ACLs, no surprise bills. One admin, one channel.
-- **Boring tech on purpose** — Next.js 14, FastAPI, Postgres 16. No microservices, no message bus,
-  no Kubernetes. `docker compose up` and you're done.
+**What you get**
+
+- 💸 **Zero storage cost** — Telegram's CDN is the bucket. You only pay for a few KB of
+  metadata per file in Postgres. No S3 bills. No egress fees. No "you've exceeded
+  your free tier" emails.
+- 🛡 **The bot token never reaches the browser** — Telegram's download URLs embed
+  the bot token and expire in ~1 hour. TGStore regenerates them server-side on
+  every request and proxies bytes through `/stream`. Even a curious DevTools user
+  can never exfiltrate the token.
+- 🧍 **Single-user, self-host, no surprise bills** — one admin, one channel, no
+  teams, no sharing ACLs, no per-seat pricing. The auth layer is literally one
+  username + bcrypt password read from env vars.
+- 🧰 **Boring tech on purpose** — Next.js 14, FastAPI, Postgres 16. No
+  microservices, no message bus, no Kubernetes, no service mesh. `docker compose up`
+  and you're done in under five minutes.
+- 🔍 **Full-text search, live stats, soft-delete, recovery** — even though the
+  backend is "just a thin layer," it ships with case-insensitive trigram search,
+  a stacked-bar storage breakdown by MIME type, and a `deleted_at` column so a
+  fat-finger delete is reversible.
+- 🧪 **Tested end-to-end** — 6 async integration tests mock the Telegram service
+  layer, so the CI proves the upload pipeline, the 2 GB cap, and the JWT guard
+  without ever talking to `api.telegram.org`.
+
+**What it isn't** (so you don't get the wrong idea)
+
+- ❌ Not a team drive. No sharing, no per-user permissions, no comments.
+- ❌ Not a Telegram *client*. The bot is the storage engine; you never see your
+  files in the Telegram app (and shouldn't — that would be a privacy footgun).
+- ❌ Not a multi-tenant SaaS. One instance = one user. Run as many as you like,
+  each pointing at its own channel.
+- ❌ Not a replacement for S3 for mission-critical workloads. Telegram *can* lose
+  access to a file (though it's never happened to the author in 18 months).
+  Treat it as a free personal cloud, not a regulated-archive backend.
 
 <br/>
 
