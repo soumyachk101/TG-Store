@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.firebase import initialize_firebase
 from app.routers import auth, files, folders
 
 logging.basicConfig(
@@ -19,6 +20,7 @@ logging.basicConfig(
 )
 
 settings = get_settings()
+initialize_firebase()
 
 app = FastAPI(
     title="TGStore API",

@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Search, LogOut, FolderPlus } from "lucide-react";
+import { Search, LogOut, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFolder } from "@/lib/api";
 import { ApiAuthBridge } from "./ApiAuthBridge";
 
 interface TopBarProps {
@@ -14,77 +11,101 @@ interface TopBarProps {
 
 export function TopBar({ search, onSearch }: TopBarProps) {
   const { data: session } = useSession();
-  const queryClient = useQueryClient();
-  const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState("");
 
-  const create = useMutation({
-    mutationFn: (name: string) => createFolder(name, null),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["folders"] }),
-  });
+  const userInitial = session?.user?.name
+    ? session.user.name.charAt(0).toUpperCase()
+    : "U";
 
   return (
     <ApiAuthBridge>
-      <header className="sticky top-0 z-30 flex h-12 items-center gap-3 border-b border-line bg-bg/95 px-4 backdrop-blur">
-        <div className="text-sm font-semibold tracking-tight text-ink">TGStore</div>
-
-        <div className="relative ml-2 max-w-md flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-faint" />
-          <input
-            value={search}
-            onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search files…"
-            className="w-full rounded-md border border-line bg-bg-subtle py-1.5 pl-8 pr-3 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
-            onKeyDown={(e) => {
-              if (e.key === "/" || e.key === "f") {
-                /* F shortcut handled at layout level */
-              }
-            }}
-          />
+      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-bg/95 px-4 backdrop-blur transition-all">
+        {/* Left Side: Brand Logo and Title */}
+        <div className="flex items-center gap-2.5">
+          {/* Custom colorful Drive-like TGStore triangle logo */}
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6.5 w-6.5 drop-shadow-sm select-none"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M8.5 4.5L2 15.5H15L8.5 4.5Z"
+              fill="url(#gradient1)"
+            />
+            <path
+              d="M15.5 8.5L9 19.5H22L15.5 8.5Z"
+              fill="url(#gradient2)"
+            />
+            <path
+              d="M12 2L5.5 13H18.5L12 2Z"
+              fill="url(#gradient3)"
+              opacity="0.85"
+            />
+            <defs>
+              <linearGradient id="gradient1" x1="2" y1="10" x2="15" y2="10" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#3b82f6" />
+                <stop offset="1" stopColor="#60a5fa" />
+              </linearGradient>
+              <linearGradient id="gradient2" x1="9" y1="14" x2="22" y2="14" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#10b981" />
+                <stop offset="1" stopColor="#34d399" />
+              </linearGradient>
+              <linearGradient id="gradient3" x1="5.5" y1="7.5" x2="18.5" y2="7.5" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#8b5cf6" />
+                <stop offset="1" stopColor="#a78bfa" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span className="text-base font-semibold tracking-tight text-ink select-none font-sans">
+            TGStore
+          </span>
         </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {creating ? (
-            <div className="flex items-center gap-1">
-              <input
-                autoFocus
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && draft.trim()) {
-                    create.mutate(draft.trim());
-                    setDraft("");
-                    setCreating(false);
-                  }
-                  if (e.key === "Escape") {
-                    setDraft("");
-                    setCreating(false);
-                  }
-                }}
-                placeholder="Folder name"
-                className="w-40 rounded-md border border-line bg-bg-subtle px-2 py-1 text-sm focus:border-accent focus:outline-none"
-              />
-            </div>
-          ) : (
-            <button
-              onClick={() => setCreating(true)}
-              className="inline-flex items-center gap-1 rounded-md border border-line bg-bg-subtle px-2 py-1 text-xs text-ink-muted hover:text-ink"
-              title="New folder (N)"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-              New folder
-            </button>
-          )}
+        {/* Center: Search Bar */}
+        <div className="relative flex-1 max-w-2xl mx-8 hidden sm:block">
+          <div className="flex items-center w-full rounded-full bg-bg-subtle border border-line px-4 py-2 shadow-sm transition-all focus-within:bg-bg-raised focus-within:border-accent focus-within:shadow-md focus-within:ring-1 focus-within:ring-accent/20">
+            <Search className="h-4.5 w-4.5 text-ink-faint shrink-0" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => onSearch(e.target.value)}
+              placeholder="Search in TGStore..."
+              className="w-full bg-transparent pl-3 pr-2 text-sm text-ink placeholder:text-ink-faint focus:outline-none"
+            />
+            {search && (
+              <button
+                onClick={() => onSearch("")}
+                className="rounded-full p-1 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
-          <span className="hidden text-xs text-ink-muted md:inline">
-            {session?.user?.name ?? ""}
-          </span>
+        {/* Right Side: Profile / Actions */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div
+              className="h-8 w-8 rounded-full bg-accent/20 border border-accent/30 text-accent font-semibold text-sm flex items-center justify-center shadow-inner cursor-default"
+              title={session?.user?.name || "User"}
+            >
+              {userInitial}
+            </div>
+            <span className="hidden text-xs font-medium text-ink-muted lg:inline select-none">
+              {session?.user?.name ?? ""}
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-line" />
+
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="rounded-md p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink"
+            className="rounded-full p-2 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
             title="Sign out"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4.5 w-4.5" />
           </button>
         </div>
       </header>

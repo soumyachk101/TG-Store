@@ -28,6 +28,7 @@ export interface FileListParams {
   limit?: number;
   search?: string;
   folder_id?: UUID | null;
+  root_only?: boolean;
   mime_type?: string;
   include_deleted?: boolean;
 }

@@ -78,6 +78,9 @@ class Folder(Base):
     path: Mapped[str] = mapped_column(
         Text, nullable=False, default="/", server_default="/"
     )
+    user_id: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="admin", default="admin"
+    )
     created_at: Mapped[datetime] = mapped_column(
         nullable=False, server_default=func.now()
     )
@@ -119,6 +122,10 @@ class File(Base):
         nullable=True,
     )
 
+    user_id: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default="admin", default="admin"
+    )
+
     # Telegram references — tg_file_id is sacred
     tg_file_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     tg_message_id: Mapped[int | None] = mapped_column(nullable=True)
@@ -139,6 +146,11 @@ class File(Base):
         Index(
             "idx_files_folder_active",
             "folder_id",
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+        Index(
+            "idx_files_user_active",
+            "user_id",
             postgresql_where=text("deleted_at IS NULL"),
         ),
         Index(

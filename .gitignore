@@ -42,3 +42,8 @@ Thumbs.db
 data/
 postgres-data/
 *.log
+
+# Firebase Service Accounts and private keys
+*firebase-sa.json
+*firebase-adminsdk*.json
+*-sa.json

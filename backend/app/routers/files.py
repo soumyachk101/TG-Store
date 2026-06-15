@@ -101,6 +101,16 @@ async def upload_file(
     if folder_id:
         try:
             parsed_folder_id = uuid.UUID(folder_id)
+            folder_check = (
+                await db.execute(
+                    select(Folder).where(Folder.id == parsed_folder_id, Folder.user_id == _claims["sub"])
+                )
+            ).scalar_one_or_none()
+            if not folder_check:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Target folder not found",
+                )
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -115,6 +125,7 @@ async def upload_file(
         folder_id=parsed_folder_id,
         tg_file_id=tg_file_id,
         tg_message_id=tg_message_id,
+        user_id=_claims["sub"],
     )
     db.add(db_file)
     await db.commit()
@@ -131,6 +142,7 @@ async def list_files(
     limit: int = Query(default=20, ge=1),
     search: Optional[str] = Query(default=None, description="Filename contains"),
     folder_id: Optional[uuid.UUID] = Query(default=None),
+    root_only: bool = Query(default=False, description="Only return files in the root folder"),
     mime_type: Optional[str] = Query(default=None),
     include_deleted: bool = Query(default=False),
     db: AsyncSession = Depends(get_db),
@@ -143,10 +155,12 @@ async def list_files(
     base = select(File)
     count_base = select(func.count(File.id))
 
-    filters = []
+    filters = [File.user_id == _claims["sub"]]
     if not include_deleted:
         filters.append(File.deleted_at.is_(None))
-    if folder_id is not None:
+    if root_only:
+        filters.append(File.folder_id.is_(None))
+    elif folder_id is not None:
         filters.append(File.folder_id == folder_id)
     if mime_type:
         filters.append(File.mime_type == mime_type)
@@ -183,8 +197,10 @@ async def storage_stats(
     _claims: dict = Depends(require_auth),
 ) -> StorageStats:
     """Aggregate counts and sizes by MIME group, for the dashboard widget."""
-    # Only active files
-    stmt = select(File.mime_type, File.size_bytes).where(File.deleted_at.is_(None))
+    # Only active files belonging to current user
+    stmt = select(File.mime_type, File.size_bytes).where(
+        File.user_id == _claims["sub"], File.deleted_at.is_(None)
+    )
     rows = (await db.execute(stmt)).all()
 
     by_group: dict[str, tuple[int, int]] = {}
@@ -217,7 +233,9 @@ async def get_file(
     _claims: dict = Depends(require_auth),
 ) -> FileResponse:
     row = (
-        await db.execute(select(File).where(File.id == file_id))
+        await db.execute(
+            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
+        )
     ).scalar_one_or_none()
     if row is None or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="File not found")
@@ -240,7 +258,9 @@ async def get_download_url(
     server-to-server use and for the preview modal to test availability.
     """
     row = (
-        await db.execute(select(File).where(File.id == file_id))
+        await db.execute(
+            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
+        )
     ).scalar_one_or_none()
     if row is None or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="File not found")
@@ -266,7 +286,9 @@ async def stream_file(
     Telegram URL or bot token.
     """
     row = (
-        await db.execute(select(File).where(File.id == file_id))
+        await db.execute(
+            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
+        )
     ).scalar_one_or_none()
     if row is None or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="File not found")
@@ -308,13 +330,23 @@ async def update_file(
 ) -> FileResponse:
     """Metadata-only update. tg_file_id and bytes never change."""
     row = (
-        await db.execute(select(File).where(File.id == file_id))
+        await db.execute(
+            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
+        )
     ).scalar_one_or_none()
     if row is None or row.deleted_at is not None:
         raise HTTPException(status_code=404, detail="File not found")
     if payload.name is not None:
         row.name = payload.name
     if payload.folder_id is not None:
+        # Verify folder ownership
+        folder_check = (
+            await db.execute(
+                select(Folder.id).where(Folder.id == payload.folder_id, Folder.user_id == _claims["sub"])
+            )
+        ).scalar_one_or_none()
+        if not folder_check:
+            raise HTTPException(status_code=404, detail="Target folder not found")
         row.folder_id = payload.folder_id
     await db.commit()
     await db.refresh(row)
@@ -334,7 +366,9 @@ async def delete_file(
     recovery — set deleted_at, don't touch tg_file_id.
     """
     row = (
-        await db.execute(select(File).where(File.id == file_id))
+        await db.execute(
+            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="File not found")

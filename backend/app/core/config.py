@@ -54,6 +54,11 @@ class Settings(BaseSettings):
         description="Max upload size in bytes (Telegram limit is 2 GB)",
     )
 
+    # --- Firebase ---
+    firebase_service_account_path: str = Field(default="", description="Path to firebase service account JSON file")
+    firebase_service_account_json: str = Field(default="", description="Serialized Firebase service account JSON string")
+    firebase_mock_auth: bool = Field(default=False, description="Enable mock verification for testing/local development")
+
     @property
     def cors_origins(self) -> List[str]:
         return [

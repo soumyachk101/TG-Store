@@ -108,3 +108,8 @@ export async function deleteFolder(id: string): Promise<DeleteResponse> {
   const r = await api.delete<DeleteResponse>(`/folders/${id}`);
   return r.data;
 }
+
+export async function renameFolder(id: string, name: string): Promise<Folder> {
+  const r = await api.patch<Folder>(`/folders/${id}`, { name });
+  return r.data;
+}

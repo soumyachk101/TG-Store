@@ -36,7 +36,12 @@ async def create_folder(
     parent: Folder | None = None
     if payload.parent_id is not None:
         parent = (
-            await db.execute(select(Folder).where(Folder.id == payload.parent_id))
+            await db.execute(
+                select(Folder).where(
+                    Folder.id == payload.parent_id,
+                    Folder.user_id == _claims["sub"],
+                )
+            )
         ).scalar_one_or_none()
         if parent is None:
             raise HTTPException(status_code=404, detail="Parent folder not found")
@@ -47,7 +52,9 @@ async def create_folder(
                 status_code=400, detail="Maximum folder depth (3) reached"
             )
 
-    folder = Folder(name=payload.name, parent_id=payload.parent_id)
+    folder = Folder(
+        name=payload.name, parent_id=payload.parent_id, user_id=_claims["sub"]
+    )
     db.add(folder)
     await db.flush()  # assign id
     # Materialize the path
@@ -69,9 +76,10 @@ async def list_folders(
     Otherwise return top-level folders.
     """
     stmt = select(Folder).where(
+        Folder.user_id == _claims["sub"],
         Folder.parent_id.is_(parent_id)
         if parent_id is None
-        else Folder.parent_id == parent_id
+        else Folder.parent_id == parent_id,
     )
     rows = (await db.execute(stmt.order_by(Folder.name))).scalars().all()
     return [FolderResponse.model_validate(r) for r in rows]
@@ -85,7 +93,11 @@ async def update_folder(
     _claims: dict = Depends(require_auth),
 ) -> FolderResponse:
     row = (
-        await db.execute(select(Folder).where(Folder.id == folder_id))
+        await db.execute(
+            select(Folder).where(
+                Folder.id == folder_id, Folder.user_id == _claims["sub"]
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -104,7 +116,11 @@ async def delete_folder(
 ) -> DeleteResponse:
     """Delete a folder. Must be empty (no files, no subfolders)."""
     row = (
-        await db.execute(select(Folder).where(Folder.id == folder_id))
+        await db.execute(
+            select(Folder).where(
+                Folder.id == folder_id, Folder.user_id == _claims["sub"]
+            )
+        )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Folder not found")
