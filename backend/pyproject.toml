@@ -21,6 +21,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",    # password hashing
     "python-dotenv>=1.0.1",
     "psycopg2-binary>=2.9.9",
+    "firebase-admin>=6.5.0",
 ]
 
 [project.optional-dependencies]
