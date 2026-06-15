@@ -17,60 +17,17 @@ interface PreviewModalProps {
 
 export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate }: PreviewModalProps) {
   const { data: session } = useSession();
-  const [objectUrl, setObjectUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const file = files[currentIndex];
 
   useEffect(() => {
-    if (!isOpen || !file) return;
-
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    // Clean up previous URL
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-      setObjectUrl(null);
+    if (isOpen && file) {
+      setLoading(true);
+      setError(null);
     }
-
-    const token = session?.apiToken ?? "";
-    const url = streamUrl(file.id);
-
-    fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => {
-        if (!r.ok) throw new Error("Failed to load file content");
-        return r.blob();
-      })
-      .then((blob) => {
-        if (active) {
-          const localUrl = URL.createObjectURL(blob);
-          setObjectUrl(localUrl);
-          setLoading(false);
-        }
-      })
-      .catch((err) => {
-        if (active) {
-          setError(err.message || "Failed to load preview");
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [file?.id, isOpen, session?.apiToken]);
-
-  // Clean up object URL on unmount
-  useEffect(() => {
-    return () => {
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl);
-      }
-    };
-  }, [objectUrl]);
+  }, [file?.id, isOpen]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -103,28 +60,17 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
     }
   };
 
+  const token = session?.apiToken ?? "";
+  const directUrl = token ? `${streamUrl(file.id)}?token=${encodeURIComponent(token)}` : "";
+
   const handleDownload = () => {
-    if (objectUrl) {
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } else {
-      // Fallback if URL isn't loaded yet
-      const url = streamUrl(file.id);
-      fetch(url, { headers: { Authorization: `Bearer ${session?.apiToken ?? ""}` } })
-        .then((r) => r.blob())
-        .then((blob) => {
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = file.name;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-        });
-    }
+    if (!directUrl) return;
+    const a = document.createElement("a");
+    a.href = directUrl;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   const mime = file.mime_type || "";
@@ -134,15 +80,6 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
   const isPdf = mime === "application/pdf";
 
   const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center text-ink-muted">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
-          <p className="mt-2 text-xs">Loading preview...</p>
-        </div>
-      );
-    }
-
     if (error) {
       return (
         <div className="text-center text-danger">
@@ -154,69 +91,90 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
       );
     }
 
-    if (!objectUrl) return null;
-
-    if (isImage) {
-      return (
-        <img
-          src={objectUrl}
-          alt={file.name}
-          className="max-h-[80vh] max-w-full rounded object-contain shadow-2xl transition-all duration-300"
-        />
-      );
-    }
-
-    if (isVideo) {
-      return (
-        <video
-          src={objectUrl}
-          controls
-          autoPlay
-          className="max-h-[80vh] max-w-full rounded shadow-2xl focus:outline-none"
-        />
-      );
-    }
-
-    if (isAudio) {
-      return (
-        <div className="rounded-xl bg-bg-raised p-8 border border-line shadow-2xl flex flex-col items-center gap-4 w-full max-w-md">
-          <span className="h-16 w-16 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xl font-bold uppercase">
-            {mime.split("/").pop()?.slice(0, 3)}
-          </span>
-          <div className="text-center">
-            <h4 className="text-sm font-semibold text-ink truncate max-w-xs">{file.name}</h4>
-            <p className="text-xs text-ink-muted mt-1">{formatBytes(file.size_bytes)}</p>
-          </div>
-          <audio src={objectUrl} controls autoPlay className="w-full mt-2" />
-        </div>
-      );
-    }
-
-    if (isPdf) {
-      return (
-        <iframe
-          src={`${objectUrl}#toolbar=0`}
-          title={file.name}
-          className="h-[80vh] w-full max-w-4xl rounded border border-line bg-white shadow-2xl"
-        />
-      );
-    }
-
-    // Default fallback
     return (
-      <div className="rounded-xl bg-bg-raised p-8 border border-line shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm">
-        <FileText className="h-16 w-16 text-ink-muted stroke-[1.2]" />
-        <div>
-          <h4 className="text-sm font-semibold text-ink truncate max-w-xs">{file.name}</h4>
-          <p className="text-xs text-ink-muted mt-1">{formatBytes(file.size_bytes)}</p>
-          <p className="text-[10px] text-ink-faint mt-1 uppercase tracking-wider">{mime}</p>
-        </div>
-        <button
-          onClick={handleDownload}
-          className="mt-2 rounded-full bg-accent hover:bg-accent-hover text-white px-5 py-2 text-xs font-medium active:scale-95 transition-transform"
-        >
-          Download to view
-        </button>
+      <div className="relative flex items-center justify-center w-full h-full">
+        {loading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-ink-muted bg-black/40 z-10 rounded">
+            <Loader2 className="h-8 w-8 animate-spin text-accent" />
+            <p className="mt-2 text-xs text-white">Loading preview...</p>
+          </div>
+        )}
+
+        {isImage && directUrl && (
+          <img
+            src={directUrl}
+            alt={file.name}
+            onLoad={() => setLoading(false)}
+            onError={() => {
+              setError("Failed to load image preview");
+              setLoading(false);
+            }}
+            className="max-h-[80vh] max-w-full rounded object-contain shadow-2xl transition-all duration-300"
+          />
+        )}
+
+        {isVideo && directUrl && (
+          <video
+            src={directUrl}
+            controls
+            autoPlay
+            onCanPlay={() => setLoading(false)}
+            onError={() => {
+              setError("Failed to load video preview");
+              setLoading(false);
+            }}
+            className="max-h-[80vh] max-w-full rounded shadow-2xl focus:outline-none"
+          />
+        )}
+
+        {isAudio && directUrl && (
+          <div className="rounded-xl bg-bg-raised p-8 border border-line shadow-2xl flex flex-col items-center gap-4 w-full max-w-md">
+            <span className="h-16 w-16 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xl font-bold uppercase">
+              {mime.split("/").pop()?.slice(0, 3)}
+            </span>
+            <div className="text-center">
+              <h4 className="text-sm font-semibold text-ink truncate max-w-xs">{file.name}</h4>
+              <p className="text-xs text-ink-muted mt-1">{formatBytes(file.size_bytes)}</p>
+            </div>
+            <audio
+              src={directUrl}
+              controls
+              autoPlay
+              onCanPlay={() => setLoading(false)}
+              onError={() => {
+                setError("Failed to load audio preview");
+                setLoading(false);
+              }}
+              className="w-full mt-2"
+            />
+          </div>
+        )}
+
+        {isPdf && directUrl && (
+          <iframe
+            src={`${directUrl}#toolbar=0`}
+            title={file.name}
+            onLoad={() => setLoading(false)}
+            className="h-[80vh] w-full max-w-4xl rounded border border-line bg-white shadow-2xl"
+          />
+        )}
+
+        {!isImage && !isVideo && !isAudio && !isPdf && (
+          <div className="rounded-xl bg-bg-raised p-8 border border-line shadow-2xl flex flex-col items-center gap-4 text-center max-w-sm">
+            <FileText className="h-16 w-16 text-ink-muted stroke-[1.2]" />
+            <div>
+              <h4 className="text-sm font-semibold text-ink truncate max-w-xs">{file.name}</h4>
+              <p className="text-xs text-ink-muted mt-1">{formatBytes(file.size_bytes)}</p>
+              <p className="text-[10px] text-ink-faint mt-1 uppercase tracking-wider">{mime}</p>
+            </div>
+            <button
+              onClick={handleDownload}
+              className="mt-2 rounded-full bg-accent hover:bg-accent-hover text-white px-5 py-2 text-xs font-medium active:scale-95 transition-transform"
+            >
+              Download to view
+            </button>
+          </div>
+        )}
       </div>
     );
   };

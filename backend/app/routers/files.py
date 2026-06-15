@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.middleware.auth import require_auth
-from app.models.db import File
+from app.models.db import File, Folder
 from app.models.schemas import (
     DeleteResponse,
     FileResponse,

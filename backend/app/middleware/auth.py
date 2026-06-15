@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -34,6 +34,9 @@ def create_access_token(subject: str) -> tuple[str, int]:
     return token, expire_seconds
 
 
+import secrets
+
+
 def verify_credentials(username: str, password: str) -> bool:
     """Constant-time comparison against env-var credentials.
 
@@ -43,15 +46,20 @@ def verify_credentials(username: str, password: str) -> bool:
         # In dev without configured creds, allow a fallback so the app boots.
         # In prod this branch is never hit (deploy checklist enforces it).
         return False
-    return username == settings.admin_username and password == settings.admin_password
+    return secrets.compare_digest(username, settings.admin_username) and secrets.compare_digest(password, settings.admin_password)
 
 
-async def require_auth(token: str | None = Depends(oauth2_scheme)) -> dict[str, Any]:
+async def require_auth(
+    token: str | None = Depends(oauth2_scheme),
+    token_query: str | None = Query(default=None, alias="token"),
+) -> dict[str, Any]:
     """FastAPI dependency: validates either a Firebase ID token or local HS256 JWT.
 
+    Supports token in Authorization header or as a query parameter (?token=...).
     Raises 401 on missing/invalid/expired tokens.
     """
-    if not token:
+    actual_token = token or token_query
+    if not actual_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
@@ -69,13 +77,13 @@ async def require_auth(token: str | None = Depends(oauth2_scheme)) -> dict[str, 
     # 1. Try Firebase Token Verification
     try:
         from firebase_admin import auth as firebase_auth
-        decoded_token = firebase_auth.verify_id_token(token)
+        decoded_token = firebase_auth.verify_id_token(actual_token)
         decoded_token["sub"] = decoded_token.get("uid") or decoded_token.get("sub")
         return decoded_token
     except Exception as firebase_exc:
         # 2. Fallback to local HS256 JWT for tests or compatibility
         try:
-            payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
+            payload = jwt.decode(actual_token, settings.jwt_secret, algorithms=["HS256"])
             return payload
         except Exception:
             raise HTTPException(

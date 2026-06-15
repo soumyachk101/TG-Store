@@ -56,20 +56,14 @@ export function FileRow({ file }: FileRowProps) {
   });
 
   function onDownload() {
-    // The browser fetches the stream URL with the bearer token; the URL itself
-    // never reaches the Telegram CDN.
-    const url = streamUrl(file.id);
-    fetch(url, { headers: { Authorization: `Bearer ${session?.apiToken ?? ""}` } })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(a.href);
-      });
+    const token = session?.apiToken ?? "";
+    const url = token ? `${streamUrl(file.id)}?token=${encodeURIComponent(token)}` : streamUrl(file.id);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   function onConfirmRename() {

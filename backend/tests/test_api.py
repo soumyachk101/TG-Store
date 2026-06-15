@@ -154,3 +154,73 @@ async def test_upload_happy_path_persists_metadata():
     assert body["name"] == "hello.txt"
     assert body["tg_file_id"] == "BAADBAADrwADBREAAYag"
     assert body["size_bytes"] == 2
+
+
+@pytest.mark.asyncio
+async def test_upload_to_folder_happy_path():
+    """Verify uploading a file to an existing folder succeeds without NameError."""
+    from app.main import app
+    import uuid
+
+    fake_telegram_result = {
+        "document": {"file_id": "BAADBAADrwADBREAAYag"},
+        "message_id": 42,
+    }
+    with patch(
+        "app.routers.files.telegram.send_document",
+        AsyncMock(return_value=fake_telegram_result),
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            r = await c.post(
+                "/auth/login", json={"username": "admin", "password": "admin"}
+            )
+            token = r.json()["access_token"]
+
+            from app.core import database as dbmod
+            from sqlalchemy.ext.asyncio import (
+                AsyncSession,
+                async_sessionmaker,
+                create_async_engine,
+            )
+            from sqlalchemy.pool import StaticPool
+            from app.models.db import Folder
+
+            test_engine = create_async_engine(
+                "sqlite+aiosqlite:///:memory:",
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+            )
+            async with test_engine.begin() as conn:
+                await conn.run_sync(dbmod.Base.metadata.create_all)
+            test_session = async_sessionmaker(
+                bind=test_engine, class_=AsyncSession, expire_on_commit=False
+            )
+
+            # Pre-populate a folder
+            folder_id = uuid.uuid4()
+            async with test_session() as s:
+                db_folder = Folder(id=folder_id, name="Test Folder", user_id="admin")
+                s.add(db_folder)
+                await s.commit()
+
+            async def override_get_db():
+                async with test_session() as s:
+                    yield s
+
+            app.dependency_overrides[dbmod.get_db] = override_get_db
+            try:
+                r = await c.post(
+                    "/files/upload",
+                    headers={"Authorization": f"Bearer {token}"},
+                    data={"folder_id": str(folder_id)},
+                    files={"file": ("hello.txt", b"hi", "text/plain")},
+                )
+            finally:
+                app.dependency_overrides.clear()
+
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["folder_id"] == str(folder_id)
+
