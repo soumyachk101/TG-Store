@@ -20,6 +20,7 @@ dependencies = [
     "python-multipart>=0.0.9",   # required for file uploads
     "passlib[bcrypt]>=1.7.4",    # password hashing
     "python-dotenv>=1.0.1",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.optional-dependencies]
