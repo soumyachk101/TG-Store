@@ -4,9 +4,9 @@ All secrets come from os.getenv / .env — never hardcode.
 """
 
 from functools import lru_cache
-from typing import List
+from typing import Any, List
 
-from pydantic import Field
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,31 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def validate_database_url(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
+    @field_validator("database_url_sync", mode="before")
+    @classmethod
+    def validate_database_url_sync(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return v
+
+    @model_validator(mode="after")
+    def derive_sync_url(self) -> "Settings":
+        default_sync = "postgresql+psycopg2://tgstore:tgstore@localhost:5432/tgstore"
+        if self.database_url_sync == default_sync or not self.database_url_sync:
+            if self.database_url != "postgresql+asyncpg://tgstore:tgstore@localhost:5432/tgstore":
+                self.database_url_sync = self.database_url.replace(
+                    "postgresql+asyncpg://", "postgresql+psycopg2://", 1
+                )
+        return self
+
 
     # --- Telegram ---
     bot_token: str = Field(default="", description="Telegram bot token from @BotFather")
