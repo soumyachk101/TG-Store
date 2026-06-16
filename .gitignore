@@ -33,6 +33,8 @@ next-env.d.ts
 .DS_Store
 .idea/
 .vscode/
+.agents/
+.claude/
 *.swp
 *.swo
 Thumbs.db
