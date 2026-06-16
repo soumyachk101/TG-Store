@@ -48,7 +48,40 @@ class Settings(BaseSettings):
                 self.database_url_sync = self.database_url.replace(
                     "postgresql+asyncpg://", "postgresql+psycopg2://", 1
                 )
+        
+        # Derive Firebase Project ID if not explicitly set
+        if not self.firebase_project_id:
+            import json
+            import os
+            # Try to load from json string
+            if self.firebase_service_account_json:
+                try:
+                    info = json.loads(self.firebase_service_account_json)
+                    self.firebase_project_id = info.get("project_id", "")
+                except Exception:
+                    pass
+            # Try to load from path
+            if not self.firebase_project_id and self.firebase_service_account_path:
+                path = self.firebase_service_account_path
+                if os.path.exists(path):
+                    try:
+                        with open(path, "r") as f:
+                            info = json.load(f)
+                            self.firebase_project_id = info.get("project_id", "")
+                    except Exception:
+                        pass
+                else:
+                    backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+                    alternative_path = os.path.join(backend_root, os.path.basename(path))
+                    if os.path.exists(alternative_path):
+                        try:
+                            with open(alternative_path, "r") as f:
+                                info = json.load(f)
+                                self.firebase_project_id = info.get("project_id", "")
+                        except Exception:
+                            pass
         return self
+
 
 
     # --- Telegram ---
@@ -88,6 +121,7 @@ class Settings(BaseSettings):
     # --- Firebase ---
     firebase_service_account_path: str = Field(default="", description="Path to firebase service account JSON file")
     firebase_service_account_json: str = Field(default="", description="Serialized Firebase service account JSON string")
+    firebase_project_id: str = Field(default="", description="Firebase Project ID")
     firebase_mock_auth: bool = Field(default=False, description="Enable mock verification for testing/local development")
 
     @property

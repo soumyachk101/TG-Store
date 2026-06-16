@@ -322,4 +322,61 @@ async def test_create_folder_endpoint():
         app.dependency_overrides.clear()
 
 
+@pytest.mark.asyncio
+async def test_require_auth_firebase_manual_fallback(monkeypatch):
+    """Test manual verification path when Firebase SDK is uninitialized."""
+    from app.middleware.auth import require_auth
+    from jose import jwt
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    import urllib.request
+    import io
+
+    # Generate a dummy RSA key pair
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_key = private_key.public_key()
+
+    # Serialize public key to PEM format
+    pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("utf-8")
+
+    # Mock fetch_google_certs to return our public key
+    import app.middleware.auth as auth_mod
+    monkeypatch.setattr(auth_mod, "fetch_google_certs", lambda: {"test-kid": pem})
+
+    # Encode token with RS256 using kid "test-kid"
+    private_pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    ).decode("utf-8")
+
+    claims = {
+        "iss": "https://securetoken.google.com/tgstore-a9d23",
+        "aud": "tgstore-a9d23",
+        "sub": "manual-test-user",
+        "email": "manual@tgstore.local",
+    }
+    
+    # Store settings
+    from app.core.config import get_settings
+    settings = get_settings()
+    settings.firebase_project_id = "tgstore-a9d23"
+
+    token = jwt.encode(
+        claims,
+        private_pem,
+        algorithm="RS256",
+        headers={"kid": "test-kid"}
+    )
+
+    # Verify that require_auth correctly uses manual verification and decodes claims
+    decoded = await require_auth(token=token)
+    assert decoded["sub"] == "manual-test-user"
+    assert decoded["email"] == "manual@tgstore.local"
+
+
+
 
