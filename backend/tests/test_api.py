@@ -224,3 +224,36 @@ async def test_upload_to_folder_happy_path():
     body = r.json()
     assert body["folder_id"] == str(folder_id)
 
+
+def test_database_url_validation():
+    """Verify that postgres:// prefix is translated to driver-specific prefixes."""
+    from app.core.config import Settings
+
+    # Override env vars for clean settings creation
+    import os
+    orig_url = os.environ.pop("DATABASE_URL", None)
+    orig_sync = os.environ.pop("DATABASE_URL_SYNC", None)
+
+    try:
+        # Test converting postgres:// for both async and sync URLs
+        s = Settings(
+            database_url="postgres://user:pass@host:5432/db",
+            database_url_sync="postgres://user:pass@host:5432/db"
+        )
+        assert s.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+        assert s.database_url_sync == "postgresql+psycopg2://user:pass@host:5432/db"
+
+        # Test auto-derivation when sync is not specified
+        s2 = Settings(
+            database_url="postgres://user:pass@host:5432/db",
+            database_url_sync=""
+        )
+        assert s2.database_url == "postgresql+asyncpg://user:pass@host:5432/db"
+        assert s2.database_url_sync == "postgresql+psycopg2://user:pass@host:5432/db"
+    finally:
+        if orig_url is not None:
+            os.environ["DATABASE_URL"] = orig_url
+        if orig_sync is not None:
+            os.environ["DATABASE_URL_SYNC"] = orig_sync
+
+
