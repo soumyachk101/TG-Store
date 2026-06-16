@@ -25,14 +25,14 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // React 18 / Next.js dev tools need unsafe-eval in development
-              ...(process.env.NODE_ENV === "development"
-                ? ["'unsafe-eval'", "'unsafe-inline'"]
-                : []),
+              `script-src 'self' 'unsafe-inline'${
+                process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
+              }`,
+              "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://api.telegram.org",
               "media-src 'self' blob: https://api.telegram.org",
               "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.telegram.org",
-              "frame-src 'self'",
+              "frame-src 'self' https://*.firebaseapp.com",
               "object-src 'none'",
               "base-uri 'self'",
               "frame-ancestors 'none'",
