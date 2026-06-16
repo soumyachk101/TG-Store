@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import Depends, HTTPException, status, Query
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 
@@ -17,7 +17,11 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-# tokenUrl is for OpenAPI docs only — actual auth is JSON-based, not OAuth form
+# tokenUrl is for OpenAPI docs only — actual auth is JSON-based, not OAuth form.
+# Tokens are accepted ONLY via the Authorization header. We deliberately do NOT
+# accept `?token=...` query strings: query parameters leak into server access
+# logs, browser history, and HTTP Referer headers, and the 24-hour token
+# lifetime is too long to accept that exposure.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
 
 
@@ -106,22 +110,31 @@ def verify_firebase_token_manually(token: str) -> dict[str, Any]:
 
 async def require_auth(
     token: str | None = Depends(oauth2_scheme),
-    token_query: str | None = Query(default=None, alias="token"),
 ) -> dict[str, Any]:
     """FastAPI dependency: validates either a Firebase ID token or local HS256 JWT.
 
-    Supports token in Authorization header or as a query parameter (?token=...).
+    The token MUST be supplied via the `Authorization: Bearer <token>` header.
+    Query-string tokens are intentionally rejected — see the comment on
+    `oauth2_scheme` above for the reasoning.
     Raises 401 on missing/invalid/expired tokens.
     """
-    actual_token = token or token_query
-    if not actual_token:
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    actual_token = token
 
     if settings.firebase_mock_auth:
+        if settings.environment == "production":
+            # CRIT-3: mock auth must never be reachable on a public deploy.
+            # Return 401 rather than 500 to avoid hinting at a misconfig.
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Mock auth is disabled in production",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         return {
             "uid": "mock-admin",
             "name": "Admin User",
@@ -154,7 +167,16 @@ async def require_auth(
                     headers={"WWW-Authenticate": "Bearer"},
                 )
     else:
-        # 2. Local HS256 JWT for tests or compatibility
+        # Local HS256 JWT path. Accepted in development for tests and the
+        # /auth/login flow; rejected outright in production so a leaked
+        # JWT_SECRET (HIGH-8) cannot mint tokens for arbitrary sub values.
+        if settings.environment == "production":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Local HS256 tokens are not accepted in production. "
+                       "Use a Firebase ID token (RS256).",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         try:
             payload = jwt.decode(actual_token, settings.jwt_secret, algorithms=["HS256"])
             return payload

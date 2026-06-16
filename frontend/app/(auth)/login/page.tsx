@@ -7,10 +7,22 @@ import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth as firebaseAuth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
 
+/**
+ * Validate the post-login redirect target. Only same-origin paths are
+ * acceptable: must start with `/` and must NOT be a protocol-relative URL
+ * (e.g. `//evil.com`).
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return "/";
+  if (!raw.startsWith("/")) return "/";
+  if (raw.startsWith("//")) return "/";
+  return raw;
+}
+
 function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const next = search.get("next") ?? "/";
+  const next = safeNext(search.get("next"));
   
   // State variables
   const [isSignUp, setIsSignUp] = useState(false);

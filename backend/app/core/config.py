@@ -118,6 +118,55 @@ class Settings(BaseSettings):
         description="Max upload size in bytes (Telegram limit is 2 GB)",
     )
 
+    # --- Runtime environment ---
+    # Set to "production" on Railway / Vercel / any real deployment.
+    # "development" (default) skips the fail-closed safety checks below so
+    # the local dev loop still works with .env.example values.
+    environment: str = Field(
+        default="development",
+        description="Runtime environment: 'development' or 'production'. "
+                    "Triggers fail-closed checks at startup.",
+    )
+
+    @model_validator(mode="after")
+    def production_safety_checks(self) -> "Settings":
+        """Refuse to boot in production with dev defaults or missing secrets.
+
+        Closes the silent-fallback paths that turn a leaked .env into a full
+        auth bypass (CRIT-3 mock auth, HIGH-8 HS256 fallback, LOW-5 dev
+        defaults). Without ENVIRONMENT=production set on the host, a fresh
+        deploy with an empty .env would boot with admin_password="changeme"
+        and jwt_secret="dev-secret-change-me" — and a leaked /download-url
+        bot token is the only thing standing between the attacker and
+        /auth/login. This validator makes that misconfiguration impossible
+        in production.
+        """
+        if self.environment != "production":
+            return self
+        if self.firebase_mock_auth:
+            raise ValueError(
+                "FIREBASE_MOCK_AUTH must be false in production. "
+                "Set ENVIRONMENT=development for local mock-auth work."
+            )
+        if self.jwt_secret == "dev-secret-change-me":
+            raise ValueError(
+                "JWT_SECRET is set to the dev default. Rotate it before "
+                "running in production (openssl rand -hex 32)."
+            )
+        if self.admin_password == "changeme":
+            raise ValueError(
+                "ADMIN_PASSWORD is set to the dev default. Rotate it before "
+                "running in production."
+            )
+        if not self.firebase_service_account_path and not self.firebase_service_account_json:
+            raise ValueError(
+                "Production requires either FIREBASE_SERVICE_ACCOUNT_PATH "
+                "or FIREBASE_SERVICE_ACCOUNT_JSON to be set. "
+                "Firebase token verification will otherwise fall through to "
+                "the HS256 path, which is disabled in production."
+            )
+        return self
+
     # --- Firebase ---
     firebase_service_account_path: str = Field(default="", description="Path to firebase service account JSON file")
     firebase_service_account_json: str = Field(default="", description="Serialized Firebase service account JSON string")

@@ -5,11 +5,12 @@ All API responses use these models — never raw dicts (per AI instructions).
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime
 from typing import Generic, List, Optional, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 T = TypeVar("T")
 
@@ -58,6 +59,20 @@ class FileUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=512)
     folder_id: Optional[uuid.UUID] = None
 
+    # Reject path-traversal-style name mutations: no `/`, `\`, control
+    # characters, or names that start or end with `.`. Mirror the
+    # FolderCreate / FolderUpdate validation.
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if not _SAFE_NAME_RE.match(v):
+            raise ValueError(
+                "name must contain only letters, digits, spaces, '.', '-', '_'"
+            )
+        return v
+
 
 class DeleteResponse(BaseModel):
     success: bool = True
@@ -77,14 +92,42 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 # --- Folders ---
 
+# Folder names are embedded into a materialized `path` and surfaced in API
+# responses / future zip-export filenames. Restrict the character set so a
+# user cannot inject `/` (path traversal), control chars (header injection),
+# or names like `.` / `..` (filesystem escape).
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9 _.\-]+$")
+
 
 class FolderCreate(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     parent_id: Optional[uuid.UUID] = None
 
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: str) -> str:
+        v = v.strip()
+        if not _SAFE_NAME_RE.match(v) or v in {".", ".."}:
+            raise ValueError(
+                "name must contain only letters, digits, spaces, '.', '-', '_'"
+            )
+        return v
+
 
 class FolderUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=128)
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not _SAFE_NAME_RE.match(v) or v in {".", ".."}:
+            raise ValueError(
+                "name must contain only letters, digits, spaces, '.', '-', '_'"
+            )
+        return v
 
 
 class FolderResponse(BaseModel):

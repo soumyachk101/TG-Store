@@ -6,6 +6,12 @@ Per Docs/TRD.md §2.3 and AI instructions:
 - All endpoints return Pydantic models
 - Soft-delete via deleted_at
 - /files/stats returns storage breakdown
+
+Note: there is intentionally NO /files/{id}/download-url endpoint. The
+Telegram download URL embeds the bot token in its path (see
+services/telegram.py), so any endpoint that returns it leaks the token
+to the caller, browser history, and access logs. The /stream proxy is
+the only safe way to retrieve file bytes.
 """
 
 from __future__ import annotations
@@ -13,6 +19,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi import File as FastAPIFile
@@ -165,9 +172,13 @@ async def list_files(
     if mime_type:
         filters.append(File.mime_type == mime_type)
     if search:
-        # Case-insensitive substring match
-        pat = f"%{search}%"
-        filters.append(File.name.ilike(pat))
+        # Escape SQL LIKE wildcards so a user-supplied `%` or `_` is matched
+        # literally instead of dumping the whole table / leaking other rows.
+        escaped = (
+            search.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+        )
+        pat = f"%{escaped}%"
+        filters.append(File.name.ilike(pat, escape="\\"))
 
     if filters:
         base = base.where(and_(*filters))
@@ -242,35 +253,16 @@ async def get_file(
     return FileResponse.model_validate(row)
 
 
-# --- Download URL (fresh Telegram URL, never cached, never sent to browser raw) ---
-
-
-@router.get("/{file_id}/download-url")
-async def get_download_url(
-    file_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    _claims: dict = Depends(require_auth),
-) -> dict:
-    """Return a freshly-generated Telegram download URL.
-
-    WARNING: This URL embeds the bot token in its path. The frontend MUST NOT
-    use it directly — it should call /stream instead. This endpoint exists for
-    server-to-server use and for the preview modal to test availability.
-    """
-    row = (
-        await db.execute(
-            select(File).where(File.id == file_id, File.user_id == _claims["sub"])
-        )
-    ).scalar_one_or_none()
-    if row is None or row.deleted_at is not None:
-        raise HTTPException(status_code=404, detail="File not found")
-    try:
-        url = await telegram.get_download_url(row.tg_file_id)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=502, detail="Could not generate download URL"
-        ) from exc
-    return {"url": url, "expires_in": 3600}
+# --- Download URL removed on purpose ---
+#
+# The Telegram download URL embeds the bot token in its path:
+#     https://api.telegram.org/file/bot<TOKEN>/<file_path>
+# An endpoint that returns this URL leaks the token via:
+#   - the caller's browser history
+#   - HTTP Referer headers
+#   - server / proxy access logs
+#   - the URL bar in any rendered preview
+# The /stream proxy below is the only safe way to fetch bytes.
 
 
 # --- Stream (proxied download — safe to call from browser) ---
@@ -308,9 +300,17 @@ async def stream_file(
                     yield chunk
 
     filename = row.name
+    # RFC 6266: percent-encode the filename so a user-supplied name containing
+    # `"`, CR, LF, or non-ASCII cannot break out of the quoted attribute or
+    # inject extra headers.
+    safe_filename = quote(filename or "download", safe="")
     headers = {
-        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Disposition": (
+            f"attachment; filename={safe_filename}; "
+            f"filename*=UTF-8''{safe_filename}"
+        ),
         "Content-Type": row.mime_type or "application/octet-stream",
+        "X-Content-Type-Options": "nosniff",
     }
     size = row.size_bytes
     if size:

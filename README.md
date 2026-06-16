@@ -485,6 +485,7 @@ sequenceDiagram
 | `ADMIN_PASSWORD` | — | `changeme` | **Set this in prod.** |
 | `ALLOWED_ORIGINS` | — | `http://localhost:3000` | Comma-separated CORS allowlist. |
 | `MAX_UPLOAD_BYTES` | — | `2147483648` | 2 GB — Telegram's Bot API cap. |
+| `ENVIRONMENT` | — | `development` | Set to `production` on Railway/Vercel. Triggers fail-closed checks on dev defaults and mock auth (see [Secret rotation](#-secret-rotation)). |
 
 ### Frontend — `frontend/.env.local`
 
@@ -493,6 +494,130 @@ sequenceDiagram
 | `NEXT_PUBLIC_API_URL` | ✅ | `http://localhost:8000` in dev, your Railway URL in prod. |
 | `AUTH_SECRET` | ✅ | `openssl rand -base64 32` — NextAuth cookie encryption. |
 | `AUTH_URL` | — | `http://localhost:3000` in dev. |
+| `NEXT_PUBLIC_FIREBASE_*` | ✅ (for Firebase auth) | Web SDK config from Firebase Console → Project Settings → Your apps. Not strictly secret (Firebase web API keys are public-by-design); add App Check + HTTP referrer restrictions in GCP. |
+
+<br/>
+
+<!-- ===================== SECRET ROTATION ===================== -->
+
+## 🔁 Secret rotation
+
+If any of these secrets have lived on a developer disk in plaintext, on a
+shared machine, in a backup, or in version control at any point — assume
+they are public and rotate them. The backend `Settings` class refuses to
+boot in production with dev defaults (see `ENVIRONMENT` above), so a
+fresh deploy cannot accidentally run with `admin_password=changeme` or
+`jwt_secret=dev-secret-change-me`.
+
+**Order matters — do these in one sitting, in this order.** A half-rotated
+state is more dangerous than not rotating at all (an old, still-trusted
+secret + a new, partly-deployed one = easy to forget which is which).
+
+### 1. Generate new values (offline)
+
+| Secret | How to generate |
+|---|---|
+| `JWT_SECRET` | `openssl rand -hex 32` |
+| `AUTH_SECRET` | `openssl rand -hex 32` |
+| `ADMIN_PASSWORD` | `openssl rand -base64 24` (or your own 20+ char password) |
+| `BOT_TOKEN` | Telegram → @BotFather → `/revoke` (picks the bot) → `/token` (gets the new one) |
+| `DATABASE_URL` / `DATABASE_URL_SYNC` | Railway → Postgres service → "Data" → "Reset Password" → copy the new connection string into both URLs |
+| Firebase SA key | GCP Console → `tgstore-a9d23` → IAM & Admin → Service Accounts → `firebase-adminsdk-fbsvc@…` → Keys → **Add Key** → **Create new key** (JSON) |
+
+Store the new values in a password manager note called "TGStore new
+secrets" before touching any production system. Do **not** write them
+into `backend/.env` yet.
+
+### 2. Local env (do this first)
+
+```bash
+rm backend/firebase-sa.json backend/.env   # remove the old plaintext copies
+# Recreate backend/.env with the NEW values from step 1.
+# Use backend/.env.example as a template.
+# Prefer FIREBASE_SERVICE_ACCOUNT_JSON over FIREBASE_SERVICE_ACCOUNT_PATH
+# so no service-account file lives on disk.
+# Add ENVIRONMENT=development (so the safety checks are off locally).
+```
+
+Verify locally boots: `cd backend && uvicorn app.main:app` and hit
+`http://localhost:8000/health`.
+
+### 3. Production env vars (Railway + Vercel, in one sitting)
+
+**Railway** → TGStore service → Variables — set:
+
+```
+BOT_TOKEN=<new>                          # Phase 1.5
+DATABASE_URL=<new with rotated password> # Phase 1.4
+DATABASE_URL_SYNC=<new with rotated password>
+JWT_SECRET=<new>                         # Phase 1.1
+ADMIN_PASSWORD=<new>                     # Phase 1.3
+ALLOWED_ORIGINS=https://tgstore.vercel.app
+FIREBASE_SERVICE_ACCOUNT_JSON=<new SA JSON, one line>
+FIREBASE_MOCK_AUTH=false
+ENVIRONMENT=production                   # enables fail-closed checks
+```
+
+**Vercel** → TGStore project → Settings → Environment Variables — set:
+
+```
+AUTH_SECRET=<new>                        # Phase 1.2
+AUTH_URL=https://tgstore.vercel.app
+NEXT_PUBLIC_API_URL=<unchanged>
+```
+
+Both deploys auto-redeploy on save. Watch Railway's deploy log for
+`INFO: Firebase initialized successfully using service account credentials JSON string.`
+
+### 4. Invalidate the old keys
+
+After the new values are live:
+
+- **Firebase**: GCP Console → Service Accounts → Keys → **delete the old
+  key** (the one with the `private_key_id` from before the rotation).
+  Verify only one key remains. The old private key is now useless.
+- **Telegram**: the old token is already revoked by the `/revoke` step in
+  Phase 1. Sanity-check: `curl -i https://api.telegram.org/bot<old>/getMe`
+  returns 404.
+- **Postgres**: the old password is already replaced by the "Reset
+  Password" step. Nothing to delete on the DB side.
+- **`JWT_SECRET` / `AUTH_SECRET` / `ADMIN_PASSWORD`**: there's no external
+  system to revoke; the old values are simply no longer trusted by the
+  backends. All in-flight sessions are invalidated (every user re-logs in;
+  this is expected).
+
+### 5. Verify
+
+```bash
+# Backend health (unauthenticated):
+curl -fsS https://<railway>.up.railway.app/health
+
+# Login with the NEW password:
+curl -fsS -X POST https://<railway>.up.railway.app/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"<new>"}'
+
+# Login FAILS with the OLD password (must return 401):
+curl -i -X POST https://<railway>.up.railway.app/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"<old>"}'
+```
+
+Then in a real browser: sign in on https://tgstore.vercel.app, upload a
+file, download it, sign out and back in. The full happy-path must work
+end to end.
+
+### 6. Why this is hard to mess up
+
+The fail-closed checks added in `backend/app/core/config.py` (see the
+`production_safety_checks` validator) mean that if you forget to set
+**any one** of the production secrets — `JWT_SECRET`, `ADMIN_PASSWORD`,
+or a Firebase service account — the backend **refuses to start** when
+`ENVIRONMENT=production`. The deploy will roll back to the last
+healthy revision and the Railway log will tell you exactly which env
+var is missing. This is intentional: a deploy that boots with
+`admin_password=changeme` is a five-minute account takeover; a deploy
+that fails to boot is just a 30-second retry.
 
 <br/>
 
