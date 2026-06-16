@@ -87,7 +87,7 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> List[str]:
         return [
-            origin.strip()
+            origin.strip().rstrip("/")
             for origin in self.allowed_origins.split(",")
             if origin.strip()
         ]
