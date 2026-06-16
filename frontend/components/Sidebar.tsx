@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { FolderPlus, Upload, HardDrive, Clock, Plus, HelpCircle } from "lucide-react";
 import { getStats } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
@@ -16,12 +17,14 @@ interface SidebarProps {
 const MOCK_TOTAL_CAPACITY = 15 * 1024 * 1024 * 1024; // 15 GB free tier representation
 
 export function Sidebar({ activeTab, setActiveTab, onNewFolder, onUploadClick }: SidebarProps) {
+  const { status } = useSession();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
+    enabled: status === "authenticated",
   });
 
   // Close "+ New" dropdown on click outside

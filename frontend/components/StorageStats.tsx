@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { getStats } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 
@@ -13,9 +14,11 @@ const COLORS: Record<string, string> = {
 };
 
 export function StorageStats() {
+  const { status } = useSession();
   const { data, isLoading } = useQuery({
     queryKey: ["stats"],
     queryFn: getStats,
+    enabled: status === "authenticated",
   });
 
   if (isLoading || !data) {

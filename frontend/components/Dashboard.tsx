@@ -43,7 +43,7 @@ interface UploadingItem {
 const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
 
 export function Dashboard() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const queryClient = useQueryClient();
 
   // Active view states
@@ -116,7 +116,7 @@ export function Dashboard() {
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
     queryKey: ["folders", currentFolderId],
     queryFn: () => listFolders(currentFolderId),
-    enabled: activeTab === "drive" && !debouncedSearch,
+    enabled: status === "authenticated" && activeTab === "drive" && !debouncedSearch,
   });
 
   // Fetch Files
@@ -136,6 +136,7 @@ export function Dashboard() {
   const { data: filesData, isLoading: filesLoading } = useQuery({
     queryKey: ["files", fileParams],
     queryFn: () => listFiles(fileParams),
+    enabled: status === "authenticated",
   });
 
   const files = filesData?.items ?? [];
