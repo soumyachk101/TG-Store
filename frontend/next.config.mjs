@@ -20,15 +20,17 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Frame-Options", value: "DENY" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
           {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              `script-src 'self' 'unsafe-inline'${
+              `script-src 'self' 'unsafe-inline' https://apis.google.com${
                 process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
               }`,
               "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data: https:",
               "img-src 'self' data: blob: https://api.telegram.org",
               "media-src 'self' blob: https://api.telegram.org",
               `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://api.telegram.org http://localhost:8000 https://tg-store-production-962c.up.railway.app ${

@@ -28,8 +28,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         username: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
+        idToken: { label: "ID Token", type: "text" },
+        email: { label: "Email", type: "text" },
+        name: { label: "Name", type: "text" },
+        uid: { label: "UID", type: "text" },
       },
       async authorize(creds) {
+        if (creds?.idToken) {
+          return {
+            id: (creds.uid as string) || "user",
+            name: (creds.name as string) || "User",
+            email: creds.email as string,
+            apiToken: creds.idToken as string,
+          } as unknown as DefaultSession["user"] & { apiToken: string };
+        }
+
         if (!creds?.username || !creds?.password) return null;
 
         // 1. Try Firebase Authentication

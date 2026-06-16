@@ -24,3 +24,8 @@ html, body {
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+.bg-dot-pattern {
+  background-image: radial-gradient(theme('colors.line.strong') 1px, transparent 0);
+  background-size: 24px 24px;
+}

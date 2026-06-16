@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, sendPasswordResetEmail } from "firebase/auth";
 import { auth as firebaseAuth } from "@/lib/firebase";
 import { Loader2 } from "lucide-react";
 
@@ -30,6 +30,8 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -37,19 +39,45 @@ function LoginForm() {
   }, [search]);
 
   // Reset inputs when switching tabs
-  const toggleMode = () => {
-    setIsSignUp(!isSignUp);
+  const toggleMode = (mode: "signIn" | "signUp" | "forgotPassword") => {
+    setIsSignUp(mode === "signUp");
+    setIsForgotPassword(mode === "forgotPassword");
     setPassword("");
     setConfirmPassword("");
     setError(null);
+    setSuccess(null);
   };
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setSuccess(null);
 
     const trimmedEmail = email.trim();
-    if (!trimmedEmail || !password) {
+    if (!trimmedEmail) {
+      setError("Please enter your email address.");
+      return;
+    }
+
+    if (isForgotPassword) {
+      startTransition(async () => {
+        if (!firebaseAuth) {
+          setError("Firebase Client SDK is not initialized.");
+          return;
+        }
+        try {
+          await sendPasswordResetEmail(firebaseAuth, trimmedEmail);
+          setSuccess("Password reset email sent! Check your inbox.");
+          setIsForgotPassword(false);
+          setPassword("");
+        } catch (err: any) {
+          setError(err.message || "Failed to send reset email.");
+        }
+      });
+      return;
+    }
+
+    if (!password) {
       setError("Please fill in all fields.");
       return;
     }
@@ -107,22 +135,62 @@ function LoginForm() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setError(null);
+    startTransition(async () => {
+      if (!firebaseAuth) {
+        setError("Firebase Client SDK is not initialized.");
+        return;
+      }
+      try {
+        const provider = new GoogleAuthProvider();
+        const userCredential = await signInWithPopup(firebaseAuth, provider);
+        const idToken = await userCredential.user.getIdToken();
+        const { uid, email, displayName } = userCredential.user;
+        
+        const r = await signIn("credentials", {
+          idToken,
+          email,
+          name: displayName,
+          uid,
+          redirect: false,
+        });
+
+        if (r?.error) {
+          setError("Google sign in failed. Please try again.");
+          return;
+        }
+        router.push(next);
+        router.refresh();
+      } catch (err: any) {
+        if (err.code !== "auth/popup-closed-by-user") {
+          setError(err.message || "Failed to sign in with Google.");
+        }
+      }
+    });
+  }
+
   return (
     <div className="w-full max-w-sm rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl select-none flex flex-col gap-6">
       {/* Title Header */}
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-ink">TGStore</h1>
         <p className="text-xs text-ink-muted mt-1.5">
-          {isSignUp ? "Create an account to get started" : "Sign in to access your storage"}
+          {isForgotPassword 
+            ? "Reset your password" 
+            : isSignUp 
+              ? "Create an account to get started" 
+              : "Sign in to access your storage"}
         </p>
       </div>
 
       {/* Tab Selectors */}
       <div className="flex border-b border-line">
         <button
-          onClick={() => isSignUp && toggleMode()}
+          type="button"
+          onClick={() => !isForgotPassword && isSignUp && toggleMode("signIn")}
           className={`flex-1 pb-2.5 text-xs font-semibold text-center border-b-2 transition-all ${
-            !isSignUp
+            !isSignUp && !isForgotPassword
               ? "border-accent text-accent"
               : "border-transparent text-ink-muted hover:text-ink"
           }`}
@@ -130,9 +198,10 @@ function LoginForm() {
           Sign In
         </button>
         <button
-          onClick={() => !isSignUp && toggleMode()}
+          type="button"
+          onClick={() => !isForgotPassword && !isSignUp && toggleMode("signUp")}
           className={`flex-1 pb-2.5 text-xs font-semibold text-center border-b-2 transition-all ${
-            isSignUp
+            isSignUp && !isForgotPassword
               ? "border-accent text-accent"
               : "border-transparent text-ink-muted hover:text-ink"
           }`}
@@ -157,30 +226,45 @@ function LoginForm() {
           />
         </label>
 
-        <label className="block text-xs">
-          <span className="text-ink-muted font-medium">Password</span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1.5 block w-full rounded-lg border border-line bg-bg px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-            autoComplete={isSignUp ? "new-password" : "current-password"}
-            required
-          />
-        </label>
+        {!isForgotPassword && (
+          <>
+            <label className="block text-xs relative">
+              <div className="flex justify-between items-center mb-1.5">
+                <span className="text-ink-muted font-medium">Password</span>
+                {!isSignUp && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMode("forgotPassword")}
+                    className="text-[10px] text-accent hover:text-accent-hover transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full rounded-lg border border-line bg-bg px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                autoComplete={isSignUp ? "new-password" : "current-password"}
+                required
+              />
+            </label>
 
-        {isSignUp && (
-          <label className="block text-xs">
-            <span className="text-ink-muted font-medium">Confirm Password</span>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1.5 block w-full rounded-lg border border-line bg-bg px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-              autoComplete="new-password"
-              required
-            />
-          </label>
+            {isSignUp && (
+              <label className="block text-xs">
+                <span className="text-ink-muted font-medium">Confirm Password</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="mt-1.5 block w-full rounded-lg border border-line bg-bg px-3.5 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                  autoComplete="new-password"
+                  required
+                />
+              </label>
+            )}
+          </>
         )}
 
         {error && (
@@ -189,20 +273,74 @@ function LoginForm() {
           </div>
         )}
 
+        {success && (
+          <div role="alert" className="text-xs text-success bg-success/10 border border-success/30 rounded-lg p-2.5 leading-normal">
+            {success}
+          </div>
+        )}
+
         <button
           type="submit"
-          disabled={isPending || !email || !password || (isSignUp && !confirmPassword)}
-          className="mt-2 w-full rounded-full bg-accent hover:bg-accent-hover text-white py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+          disabled={isPending || !email || (!isForgotPassword && (!password || (isSignUp && !confirmPassword)))}
+          className="mt-2 w-full rounded-full bg-accent hover:bg-accent-hover text-white py-2.5 text-sm font-semibold transition-[transform,background-color] duration-150 ease-out-expo active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {isPending ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin text-white" />
-              <span>{isSignUp ? "Creating..." : "Signing in..."}</span>
+              <span>{isForgotPassword ? "Sending..." : isSignUp ? "Creating..." : "Signing in..."}</span>
             </>
           ) : (
-            <span>{isSignUp ? "Register" : "Sign In"}</span>
+            <span>{isForgotPassword ? "Send Reset Link" : isSignUp ? "Register" : "Sign In"}</span>
           )}
         </button>
+
+        {isForgotPassword && (
+          <button
+            type="button"
+            onClick={() => toggleMode("signIn")}
+            className="text-xs text-ink-muted hover:text-ink font-medium transition-colors"
+          >
+            Back to login
+          </button>
+        )}
+
+        {!isForgotPassword && (
+          <>
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-line"></div>
+              <span className="flex-shrink-0 px-3 text-xs text-ink-muted">or</span>
+              <div className="flex-grow border-t border-line"></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isPending}
+              className="w-full rounded-full bg-bg-raised hover:bg-line border border-line text-ink py-2.5 text-sm font-semibold transition-[transform,background-color] duration-150 ease-out-expo active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  fill="#4285F4"
+                />
+                <path
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  fill="#34A853"
+                />
+                <path
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  fill="#FBBC05"
+                />
+                <path
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  fill="#EA4335"
+                />
+                <path d="M1 1h22v22H1z" fill="none" />
+              </svg>
+              <span>Sign in with Google</span>
+            </button>
+          </>
+        )}
       </form>
     </div>
   );

@@ -332,7 +332,7 @@ export function Dashboard() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                className="rounded-full p-2 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                className="rounded-full p-2 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                 title={viewMode === "grid" ? "List view" : "Grid view"}
               >
                 {viewMode === "grid" ? <List className="h-4.5 w-4.5" /> : <Grid className="h-4.5 w-4.5" />}
@@ -362,7 +362,7 @@ export function Dashboard() {
                         key={f.id}
                         onDoubleClick={() => handleFolderDoubleClick(f)}
                         onClick={() => handleFolderDoubleClick(f)} // Fallback for single-click screens
-                        className="group relative flex items-center justify-between rounded-xl border border-line bg-bg-raised/40 px-3.5 py-3 hover:border-line-strong hover:bg-bg-raised cursor-pointer select-none transition-all duration-150 active:scale-[0.98]"
+                        className="group relative flex items-center justify-between rounded-xl border border-line bg-bg-raised/40 px-3.5 py-3 hover:border-line-strong hover:bg-bg-raised cursor-pointer select-none transition-[transform,background-color,border-color] ease-out-expo duration-150 active:scale-[0.97]"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <Folder className="h-5 w-5 text-accent shrink-0 fill-accent/5" />
@@ -379,7 +379,7 @@ export function Dashboard() {
                               activeDropdown?.id === f.id ? null : { type: "folder", id: f.id }
                             );
                           }}
-                          className="rounded-full p-1 text-ink-faint hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                          className="rounded-full p-1 text-ink-faint hover:bg-bg-subtle hover:text-ink active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </button>
@@ -484,7 +484,7 @@ export function Dashboard() {
                                       setPreviewIndex(fileIdx);
                                       setPreviewOpen(true);
                                     }}
-                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                                     title="Preview"
                                   >
                                     <Eye className="h-3.5 w-3.5" />
@@ -494,7 +494,7 @@ export function Dashboard() {
                                       e.stopPropagation();
                                       handleFileDownload(file);
                                     }}
-                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                                     title="Download"
                                   >
                                     <Download className="h-3.5 w-3.5" />
@@ -508,7 +508,7 @@ export function Dashboard() {
                                           : { type: "file", id: file.id }
                                       );
                                     }}
-                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-all"
+                                    className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                                   >
                                     <MoreVertical className="h-3.5 w-3.5" />
                                   </button>
@@ -585,7 +585,7 @@ export function Dashboard() {
                             setPreviewIndex(fileIdx);
                             setPreviewOpen(true);
                           }}
-                          className="group relative flex flex-col rounded-xl border border-line bg-bg-raised/20 hover:border-line-strong hover:bg-bg-raised/40 cursor-pointer select-none transition-all duration-150 overflow-hidden shadow-xs hover:shadow-md"
+                          className="group relative flex flex-col rounded-xl border border-line bg-bg-raised/20 hover:border-line-strong hover:bg-bg-raised/40 cursor-pointer select-none transition-[transform,background-color,border-color,box-shadow] ease-out-expo duration-150 overflow-hidden shadow-xs hover:shadow-md active:scale-[0.97]"
                         >
                           {/* File Preview Area / Icon Placeholder */}
                           <div className="h-28 bg-bg-raised/50 flex items-center justify-center relative border-b border-line/40 group-hover:bg-bg-subtle/30 transition-colors">
@@ -600,7 +600,7 @@ export function Dashboard() {
                                   e.stopPropagation();
                                   handleFileDownload(file);
                                 }}
-                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-95 transition-all"
+                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                               >
                                 <Download className="h-3.5 w-3.5" />
                               </button>
@@ -613,7 +613,7 @@ export function Dashboard() {
                                       : { type: "file", id: file.id }
                                   );
                                 }}
-                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-95 transition-all"
+                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                               >
                                 <MoreVertical className="h-3.5 w-3.5" />
                               </button>
@@ -702,7 +702,7 @@ export function Dashboard() {
                   {!debouncedSearch && (
                     <button
                       onClick={handleTriggerUpload}
-                      className="mt-5 rounded-full bg-accent hover:bg-accent-hover text-white px-5 py-2.5 text-xs font-medium active:scale-95 transition-transform shadow-md"
+                      className="mt-5 rounded-full bg-accent hover:bg-accent-hover text-white px-5 py-2.5 text-xs font-medium active:scale-[0.97] transition-[transform,background-color] ease-out-expo duration-150 shadow-md"
                     >
                       Upload Files
                     </button>
