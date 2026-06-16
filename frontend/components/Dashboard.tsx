@@ -23,6 +23,10 @@ import {
   Music,
   Image as ImageIcon,
   FolderPlus,
+  Plus,
+  Upload,
+  Clock,
+  HardDrive,
 } from "lucide-react";
 
 import { TopBar } from "./TopBar";
@@ -48,6 +52,7 @@ export function Dashboard() {
 
   // Active view states
   const [activeTab, setActiveTab] = useState<"drive" | "recent">("drive");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [search, setSearch] = useState("");
@@ -111,6 +116,17 @@ export function Dashboard() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Close mobile dropdown menu on click outside
+  useEffect(() => {
+    function handleGlobalClick() {
+      if (mobileMenuOpen) {
+        setMobileMenuOpen(false);
+      }
+    }
+    document.addEventListener("click", handleGlobalClick);
+    return () => document.removeEventListener("click", handleGlobalClick);
+  }, [mobileMenuOpen]);
 
   // Fetch Folders
   const { data: folders = [], isLoading: foldersLoading } = useQuery({
@@ -284,7 +300,7 @@ export function Dashboard() {
         />
 
         {/* Main Panel */}
-        <main className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
+        <main className="flex-1 p-6 flex flex-col gap-6 overflow-y-auto max-h-[calc(100vh-3.5rem)] pb-24 md:pb-6">
           {/* Action Row */}
           <div className="flex items-center justify-between border-b border-line pb-4 shrink-0">
             {/* Breadcrumb path */}
@@ -436,6 +452,12 @@ export function Dashboard() {
                           {files.map((file, fileIdx) => (
                             <tr
                               key={file.id}
+                              onClick={() => {
+                                if (window.innerWidth < 768) {
+                                  setPreviewIndex(fileIdx);
+                                  setPreviewOpen(true);
+                                }
+                              }}
                               onDoubleClick={() => {
                                 setPreviewIndex(fileIdx);
                                 setPreviewOpen(true);
@@ -455,7 +477,7 @@ export function Dashboard() {
                                 {timeAgo(file.created_at)}
                               </td>
                               <td className="px-4 py-2.5 text-right relative">
-                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -553,6 +575,12 @@ export function Dashboard() {
                       {files.map((file, fileIdx) => (
                         <div
                           key={file.id}
+                          onClick={() => {
+                            if (window.innerWidth < 768) {
+                              setPreviewIndex(fileIdx);
+                              setPreviewOpen(true);
+                            }
+                          }}
                           onDoubleClick={() => {
                             setPreviewIndex(fileIdx);
                             setPreviewOpen(true);
@@ -566,7 +594,7 @@ export function Dashboard() {
                             </span>
 
                             {/* Floating overlay quick actions */}
-                            <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -746,6 +774,81 @@ export function Dashboard() {
         currentIndex={previewIndex}
         onNavigate={(idx) => setPreviewIndex(idx)}
       />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 h-16 bg-bg-raised/90 border-t border-line backdrop-blur-md flex md:hidden items-center justify-around px-4 shadow-lg pb-safe">
+        {/* Drive Tab */}
+        <button
+          onClick={() => {
+            setActiveTab("drive");
+            setCurrentFolderId(null);
+            setBreadcrumbs([{ id: null, name: "My Drive" }]);
+          }}
+          className={`flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${
+            activeTab === "drive" && !debouncedSearch ? "text-accent" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          <HardDrive className="h-5 w-5" />
+          <span className="text-[10px] font-medium font-sans">Drive</span>
+        </button>
+
+        {/* Plus Button in the middle */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMobileMenuOpen(!mobileMenuOpen);
+            }}
+            className="flex items-center justify-center h-12 w-12 rounded-full bg-accent text-white shadow-lg hover:bg-accent-hover active:scale-95 transition-all duration-100 -translate-y-2 border-4 border-bg"
+            aria-label="New item"
+          >
+            <Plus className={`h-6 w-6 transition-transform duration-200 ${mobileMenuOpen ? "rotate-45" : ""}`} />
+          </button>
+
+          {mobileMenuOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-16 left-1/2 -translate-x-1/2 z-40 w-48 rounded-xl border border-line bg-bg-raised p-1.5 shadow-2xl origin-bottom animate-in fade-in slide-in-from-bottom-2 duration-150"
+            >
+              <button
+                onClick={() => {
+                  setNewFolderOpen(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-bg-subtle transition-colors active:scale-[0.98]"
+              >
+                <FolderPlus className="h-4 w-4 text-accent" />
+                New folder
+              </button>
+              <button
+                onClick={() => {
+                  handleTriggerUpload();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-bg-subtle transition-colors active:scale-[0.98] border-t border-line mt-1 pt-2"
+              >
+                <Upload className="h-4 w-4 text-accent" />
+                File upload
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Recent Tab */}
+        <button
+          onClick={() => {
+            setActiveTab("recent");
+            setCurrentFolderId(null);
+            setBreadcrumbs([{ id: null, name: "My Drive" }]);
+          }}
+          className={`flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${
+            activeTab === "recent" ? "text-accent" : "text-ink-muted hover:text-ink"
+          }`}
+        >
+          <Clock className="h-5 w-5" />
+          <span className="text-[10px] font-medium font-sans">Recent</span>
+        </button>
+      </div>
     </div>
   );
 }

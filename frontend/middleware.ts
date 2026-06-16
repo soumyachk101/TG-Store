@@ -7,12 +7,13 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiAuth = nextUrl.pathname.startsWith("/api/auth");
+  const isPublicPage = ["/terms", "/privacy", "/disclaimer"].includes(nextUrl.pathname);
 
   if (isApiAuth) return NextResponse.next();
   if (isLoggedIn && isAuthPage) {
     return NextResponse.redirect(new URL("/", nextUrl));
   }
-  if (!isLoggedIn && !isAuthPage) {
+  if (!isLoggedIn && !isAuthPage && !isPublicPage) {
     const url = new URL("/login", nextUrl);
     if (nextUrl.pathname !== "/") url.searchParams.set("next", nextUrl.pathname);
     return NextResponse.redirect(url);

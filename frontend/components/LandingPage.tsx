@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export default function LandingPage() {
   return (
-    <div className="relative min-h-screen bg-bg text-ink overflow-hidden flex flex-col font-sans select-none">
+    <div className="relative min-h-screen bg-bg text-ink overflow-x-hidden flex flex-col font-sans select-none">
       {/* Background ambient glow blurs */}
       <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-accent/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none" />
@@ -117,9 +117,30 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto border-t border-line/30 py-6 px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-ink-faint gap-3 mt-12">
-        <span>© {new Date().getFullYear()} TGStore. All rights reserved.</span>
-        <span className="flex items-center gap-1 select-none">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto border-t border-line/30 py-6 px-6 flex flex-col sm:flex-row items-center justify-between text-xs text-ink-faint gap-4 mt-12">
+        <div className="flex flex-col gap-1 items-center sm:items-start text-center sm:text-left">
+          <span>© {new Date().getFullYear()} TGStore. All rights reserved.</span>
+          <span>
+            Developed by{" "}
+            <span className="font-semibold text-accent/90 hover:text-accent transition-colors cursor-default">
+              Soumya Chakraborty
+            </span>
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-medium">
+          <Link href="/terms" className="hover:text-ink transition-colors duration-150">
+            Terms & Conditions
+          </Link>
+          <Link href="/privacy" className="hover:text-ink transition-colors duration-150">
+            Privacy Policy
+          </Link>
+          <Link href="/disclaimer" className="hover:text-ink transition-colors duration-150">
+            Disclaimer
+          </Link>
+        </div>
+
+        <span className="flex items-center gap-1 select-none text-center sm:text-right">
           Made with Next.js, FastAPI & Telegram CDN.
         </span>
       </footer>

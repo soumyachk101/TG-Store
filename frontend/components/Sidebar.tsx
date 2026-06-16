@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { FolderPlus, Upload, HardDrive, Clock, Plus, HelpCircle } from "lucide-react";
+import Link from "next/link";
 import { getStats } from "@/lib/api";
 import { formatBytes } from "@/lib/format";
 
@@ -130,12 +131,22 @@ export function Sidebar({ activeTab, setActiveTab, onNewFolder, onUploadClick }:
           </div>
         </div>
 
-        <div className="text-[10px] text-ink-faint leading-relaxed bg-bg-raised p-2.5 rounded-lg border border-line flex flex-col gap-1">
+        <div className="text-[10px] text-ink-faint leading-relaxed bg-bg-raised p-2.5 rounded-lg border border-line flex flex-col gap-1.5">
           <div className="flex items-center gap-1.5 font-medium text-ink-muted">
             <HelpCircle className="h-3 w-3 text-accent" />
             <span>Infrastructure Info</span>
           </div>
           <span>Free CDN powered by Telegram. Files up to 2 GB are indexed in PostgreSQL.</span>
+          <div className="border-t border-line/50 pt-1.5 mt-0.5 flex flex-col gap-1 text-[9px] text-ink-faint/80">
+            <span>Developed by <span className="font-semibold text-accent/90 cursor-default">Soumya Chakraborty</span></span>
+            <div className="flex gap-2">
+              <Link href="/terms" className="hover:text-ink transition-colors">Terms</Link>
+              <span>•</span>
+              <Link href="/privacy" className="hover:text-ink transition-colors">Privacy</Link>
+              <span>•</span>
+              <Link href="/disclaimer" className="hover:text-ink transition-colors">Disclaimer</Link>
+            </div>
+          </div>
         </div>
       </div>
     </aside>

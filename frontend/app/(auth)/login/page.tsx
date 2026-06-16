@@ -198,7 +198,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen place-items-center bg-bg px-4 relative overflow-hidden">
+    <main className="grid min-h-screen place-items-center bg-bg px-4 relative overflow-x-hidden overflow-y-auto py-8">
       {/* Background blurs */}
       <div className="absolute top-[-20%] left-[-20%] w-[60vw] h-[60vw] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[-20%] right-[-20%] w-[60vw] h-[60vw] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none" />
