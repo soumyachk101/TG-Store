@@ -133,13 +133,7 @@ export default function LandingPage() {
         </section>
 
         {/* How it Works / Tech Stack */}
-        <motion.section 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className="w-full mt-32 mb-10 text-center"
-        >
+        <motion.section initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6, ease: "easeOut" }} className="w-full mt-32 mb-10 text-center">
           <h2 className="text-sm font-bold tracking-widest text-accent uppercase mb-12">Architecture & Stack</h2>
           <div className="flex flex-wrap justify-center gap-6 max-w-3xl mx-auto">
             <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border border-line bg-bg-raised/30 hover:bg-bg-raised transition-colors">
@@ -157,16 +151,10 @@ export default function LandingPage() {
               <span className="font-semibold text-sm">Telegram CDN</span>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Feature Highlights Grid (Bento Box) */}
-        <motion.section 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
-          className="w-full mt-24"
-        >
+        <motion.section initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }} className="w-full mt-24">
           <h2 className="text-3xl font-extrabold text-center text-ink tracking-tight mb-12">Engineered for Scale</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-6 w-full max-w-5xl mx-auto">
@@ -208,16 +196,10 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* Trust Row / Testimonial */}
-        <motion.section 
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
-          className="w-full mt-32 border-y border-line/50 bg-bg-subtle/30 py-16 text-center"
-        >
+        <motion.section initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-100px" }} transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }} className="w-full mt-32 border-y border-line/50 bg-bg-subtle/30 py-16 text-center">
           <p className="text-sm font-semibold tracking-widest text-ink-muted uppercase mb-8">Trusted by Data Hoarders</p>
           <div className="flex flex-col items-center justify-center">
             <div className="flex -space-x-4 mb-6">

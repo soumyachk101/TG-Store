@@ -38,6 +38,15 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
     }
   }, [isOpen]);
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed) {
+      setError(null);
+      mutation.mutate(trimmed);
+    }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -95,7 +104,6 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
             >
               {mutation.isPending ? "Creating..." : "Create"}
             </button>
-            </button>
           </div>
         </form>
           </motion.div>
@@ -135,6 +143,14 @@ export function RenameModal({ isOpen, onClose, itemId, itemType, initialName }: 
       onClose();
     },
   });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== initialName) {
+      mutation.mutate(trimmed);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -186,7 +202,6 @@ export function RenameModal({ isOpen, onClose, itemId, itemType, initialName }: 
             >
               {mutation.isPending ? "Renaming..." : "OK"}
             </button>
-            </button>
           </div>
         </form>
           </motion.div>
@@ -233,6 +248,20 @@ export function MoveModal({ isOpen, onClose, fileId, fileName, currentFolderId }
       setNavStack([{ id: null, name: "My Drive" }]);
     }
   }, [isOpen]);
+
+  const navigateTo = (id: string, name: string) => {
+    setNavStack([...navStack, { id, name }]);
+  };
+
+  const navigateBack = () => {
+    if (navStack.length > 1) {
+      setNavStack(navStack.slice(0, -1));
+    }
+  };
+
+  const handleMove = () => {
+    moveMutation.mutate(activeFolder.id);
+  };
 
   return (
     <AnimatePresence>
