@@ -17,7 +17,10 @@ declare module "next-auth" {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 60 * 60, // 1 hour (matches Firebase ID token expiry to prevent 401s on expired tokens)
+  },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
