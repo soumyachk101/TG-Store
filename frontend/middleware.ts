@@ -18,7 +18,12 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthPage = nextUrl.pathname.startsWith("/login");
   const isApiAuth = nextUrl.pathname.startsWith("/api/auth");
-  const isPublicPage = ["/terms", "/privacy", "/disclaimer"].includes(nextUrl.pathname);
+  const isPublicPage = [
+    "/terms",
+    "/privacy",
+    "/disclaimer",
+    "/google34fa8d6ffd2a7690.html",
+  ].includes(nextUrl.pathname);
 
   if (isApiAuth) return NextResponse.next();
   if (isLoggedIn && isAuthPage) {
