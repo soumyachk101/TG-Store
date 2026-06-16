@@ -43,7 +43,17 @@ app.include_router(files.router)
 app.include_router(folders.router)
 
 
+@app.get("/", tags=["meta"])
+async def root() -> dict:
+    """Root endpoint returning API status."""
+    return {
+        "status": "ok",
+        "message": "TGStore API is running. See /docs for API documentation."
+    }
+
+
 @app.get("/health", tags=["meta"])
 async def health() -> dict:
     """Liveness probe. Unauthenticated by design."""
     return {"status": "ok"}
+

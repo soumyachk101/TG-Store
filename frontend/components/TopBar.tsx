@@ -2,7 +2,6 @@
 
 import { Search, LogOut, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
-import { ApiAuthBridge } from "./ApiAuthBridge";
 
 interface TopBarProps {
   search: string;
@@ -17,8 +16,7 @@ export function TopBar({ search, onSearch }: TopBarProps) {
     : "U";
 
   return (
-    <ApiAuthBridge>
-      <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-bg/95 px-4 backdrop-blur transition-all">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-bg/95 px-4 backdrop-blur transition-all">
         {/* Left Side: Brand Logo and Title */}
         <div className="flex items-center gap-2.5">
           {/* Custom colorful Drive-like TGStore triangle logo */}
@@ -108,7 +106,6 @@ export function TopBar({ search, onSearch }: TopBarProps) {
             <LogOut className="h-4.5 w-4.5" />
           </button>
         </div>
-      </header>
-    </ApiAuthBridge>
+    </header>
   );
 }

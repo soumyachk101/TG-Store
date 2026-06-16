@@ -13,6 +13,7 @@ interface NewFolderModalProps {
 
 export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProps) {
   const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
@@ -22,11 +23,18 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       onClose();
       setName("");
+      setError(null);
+    },
+    onError: (err: any) => {
+      setError(err.response?.data?.detail || "Failed to create folder. Please try again.");
     },
   });
 
   useEffect(() => {
-    if (isOpen) setName("");
+    if (isOpen) {
+      setName("");
+      setError(null);
+    }
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -35,6 +43,7 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
     e.preventDefault();
     const trimmed = name.trim();
     if (trimmed) {
+      setError(null);
       mutation.mutate(trimmed);
     }
   };
@@ -61,6 +70,12 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-lg border border-line bg-bg px-4 py-2.5 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
           />
+
+          {error && (
+            <div className="mt-3 text-xs text-danger bg-danger/10 border border-danger/30 rounded-lg p-2.5 leading-normal">
+              {error}
+            </div>
+          )}
 
           <div className="mt-6 flex justify-end gap-3">
             <button

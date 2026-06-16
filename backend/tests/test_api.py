@@ -257,3 +257,69 @@ def test_database_url_validation():
             os.environ["DATABASE_URL_SYNC"] = orig_sync
 
 
+@pytest.mark.asyncio
+async def test_create_folder_endpoint():
+    """Verify that folder creation works and materializes the path correctly."""
+    from app.main import app
+    from app.core import database as dbmod
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+    from sqlalchemy.pool import StaticPool
+
+    test_engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with test_engine.begin() as conn:
+        await conn.run_sync(dbmod.Base.metadata.create_all)
+    test_session = async_sessionmaker(
+        bind=test_engine, class_=AsyncSession, expire_on_commit=False
+    )
+
+    async def override_get_db():
+        async with test_session() as s:
+            yield s
+
+    app.dependency_overrides[dbmod.get_db] = override_get_db
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as c:
+            # 1. Login to get token
+            r = await c.post(
+                "/auth/login", json={"username": "admin", "password": "admin"}
+            )
+            token = r.json()["access_token"]
+
+            # 2. Create root folder
+            r = await c.post(
+                "/folders",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"name": "Documents", "parent_id": None},
+            )
+            assert r.status_code == 201, r.text
+            root_folder = r.json()
+            assert root_folder["name"] == "Documents"
+            assert root_folder["path"] == "/Documents"
+            assert root_folder["parent_id"] is None
+
+            # 3. Create subfolder
+            r = await c.post(
+                "/folders",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"name": "Invoices", "parent_id": root_folder["id"]},
+            )
+            assert r.status_code == 201, r.text
+            sub_folder = r.json()
+            assert sub_folder["name"] == "Invoices"
+            assert sub_folder["path"] == "/Documents/Invoices"
+            assert sub_folder["parent_id"] == root_folder["id"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+
