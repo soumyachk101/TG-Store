@@ -60,12 +60,20 @@ def initialize_firebase():
             print(f"WARNING: Failed to parse/use firebase_service_account_json env: {e}")
 
     # 3. Fallback to Application Default Credentials (ADC) or credentials file in standard path
-    try:
-        firebase_admin.initialize_app()
-        print("INFO: Firebase initialized using Application Default Credentials (ADC).")
-    except Exception as e:
-        if settings.firebase_service_account_path:
-            print(f"WARNING: Firebase service account path not found at: {settings.firebase_service_account_path}")
-        print(f"WARNING: Could not initialize Firebase Admin SDK natively ({e}). "
-              "Requests requiring token verification will fail unless mock auth is enabled.")
+    has_gcp_creds = "GOOGLE_APPLICATION_CREDENTIALS" in os.environ
+    has_gcp_env = any(env in os.environ for env in ["GAE_ENV", "K_SERVICE", "CLOUD_RUN_SERVICE"])
+
+    if has_gcp_creds or has_gcp_env:
+        try:
+            firebase_admin.initialize_app()
+            print("INFO: Firebase initialized using Application Default Credentials (ADC).")
+        except Exception as e:
+            if settings.firebase_service_account_path:
+                print(f"WARNING: Firebase service account path not found at: {settings.firebase_service_account_path}")
+            print(f"WARNING: Could not initialize Firebase Admin SDK natively ({e}). "
+                  "Requests requiring token verification will fail unless mock auth is enabled.")
+    else:
+        print("INFO: Firebase is not configured (no service account JSON, path file, or GCP environment). "
+              "Token verification via Firebase will be inactive, falling back to local JWT.")
+
 
