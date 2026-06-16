@@ -35,6 +35,7 @@ next-env.d.ts
 .vscode/
 .agents/
 .claude/
+skills-lock.json
 *.swp
 *.swo
 Thumbs.db
