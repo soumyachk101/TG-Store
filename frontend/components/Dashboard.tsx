@@ -275,7 +275,7 @@ export function Dashboard() {
       <TopBar search={search} onSearch={setSearch} />
 
       <div className="flex flex-1 relative" {...getRootProps()}>
-        <input {...getInputProps()} />
+        <input {...getInputProps({ style: {} })} className="sr-only" />
 
         {/* Drag overlay indicator */}
         {isDragActive && (
@@ -823,7 +823,9 @@ export function Dashboard() {
               <button
                 onClick={() => {
                   handleTriggerUpload();
-                  setMobileMenuOpen(false);
+                  setTimeout(() => {
+                    setMobileMenuOpen(false);
+                  }, 100);
                 }}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-bg-subtle transition-colors active:scale-[0.98] border-t border-line mt-1 pt-2"
               >

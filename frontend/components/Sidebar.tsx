@@ -70,7 +70,9 @@ export function Sidebar({ activeTab, setActiveTab, onNewFolder, onUploadClick }:
             <button
               onClick={() => {
                 onUploadClick();
-                setNewMenuOpen(false);
+                setTimeout(() => {
+                  setNewMenuOpen(false);
+                }, 100);
               }}
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-bg-subtle transition-colors active:scale-[0.98] border-t border-line mt-1 pt-2"
             >
