@@ -27,6 +27,7 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
       setLoading(true);
       setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file?.id, isOpen]);
 
   // Keyboard navigation
@@ -44,6 +45,7 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentIndex, files.length]);
 
   if (!isOpen || !file) return null;
@@ -101,6 +103,7 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
         )}
 
         {isImage && directUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={directUrl}
             alt={file.name}

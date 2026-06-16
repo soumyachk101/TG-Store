@@ -210,7 +210,7 @@ export default function LandingPage() {
               ))}
             </div>
             <p className="text-lg md:text-xl font-medium text-ink max-w-2xl px-4 leading-relaxed italic">
-              "TGStore completely replaced my need for paid cloud subscriptions. The interface is incredibly fast, and storing everything on Telegram's CDN is brilliant."
+              &quot;TGStore completely replaced my need for paid cloud subscriptions. The interface is incredibly fast, and storing everything on Telegram&apos;s CDN is brilliant.&quot;
             </p>
           </div>
         </motion.section>
