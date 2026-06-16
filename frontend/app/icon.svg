@@ -1,0 +1,19 @@
+<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M8.5 4.5L2 15.5H15L8.5 4.5Z" fill="url(#loginGrad1)" />
+  <path d="M15.5 8.5L9 19.5H22L15.5 8.5Z" fill="url(#loginGrad2)" />
+  <path d="M12 2L5.5 13H18.5L12 2Z" fill="url(#loginGrad3)" opacity="0.85" />
+  <defs>
+    <linearGradient id="loginGrad1" x1="2" y1="10" x2="15" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#3b82f6" />
+      <stop offset="1" stopColor="#60a5fa" />
+    </linearGradient>
+    <linearGradient id="loginGrad2" x1="9" y1="14" x2="22" y2="14" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#10b981" />
+      <stop offset="1" stopColor="#34d399" />
+    </linearGradient>
+    <linearGradient id="loginGrad3" x1="5.5" y1="7.5" x2="18.5" y2="7.5" gradientUnits="userSpaceOnUse">
+      <stop stopColor="#8b5cf6" />
+      <stop offset="1" stopColor="#a78bfa" />
+    </linearGradient>
+  </defs>
+</svg>

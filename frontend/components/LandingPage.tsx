@@ -152,35 +152,64 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Feature Highlights Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-16 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
-          <div className="group flex flex-col items-start p-8 rounded-3xl border border-line bg-bg-raised/20 hover:border-accent/40 hover:bg-bg-raised/50 transition-all duration-300 hover:-translate-y-1 active:scale-[0.97] cursor-default">
-            <span className="h-12 w-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ease-out-expo">
-              <HardDrive className="h-6 w-6" />
-            </span>
-            <h3 className="text-lg font-bold text-ink">Infinite Storage</h3>
-            <p className="mt-3 text-sm text-ink-muted leading-relaxed">
-              Upload files up to 2 GB with zero storage caps. Your files are divided, uploaded, and indexed directly onto Telegram&apos;s robust network.
-            </p>
-          </div>
+        {/* Feature Highlights Grid (Bento Box) */}
+        <section className="w-full mt-24 animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
+          <h2 className="text-3xl font-extrabold text-center text-ink tracking-tight mb-12">Engineered for Scale</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 md:grid-rows-2 gap-6 w-full max-w-5xl mx-auto">
+            {/* Infinite Storage - Large block */}
+            <div className="md:col-span-2 md:row-span-2 group relative flex flex-col p-8 md:p-12 rounded-[2rem] border border-line bg-bg-raised/20 hover:border-accent/40 hover:bg-bg-raised/40 transition-all duration-300 overflow-hidden cursor-default">
+              <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-40 transition-opacity">
+                <HardDrive className="h-32 w-32 text-accent" />
+              </div>
+              <span className="relative h-14 w-14 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mb-auto group-hover:scale-110 transition-transform duration-300 ease-out-expo shadow-inner">
+                <HardDrive className="h-7 w-7" />
+              </span>
+              <div className="relative mt-12 md:mt-32">
+                <h3 className="text-2xl font-bold text-ink">Infinite Storage</h3>
+                <p className="mt-3 text-base text-ink-muted leading-relaxed max-w-sm">
+                  Upload files up to 2 GB with zero storage caps. Your files are chunked, uploaded, and indexed directly onto Telegram&apos;s robust global CDN network.
+                </p>
+              </div>
+            </div>
 
-          <div className="group flex flex-col items-start p-8 rounded-3xl border border-line bg-bg-raised/20 hover:border-purple-500/40 hover:bg-bg-raised/50 transition-all duration-300 hover:-translate-y-1 active:scale-[0.97] cursor-default">
-            <span className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ease-out-expo">
-              <ShieldCheck className="h-6 w-6" />
-            </span>
-            <h3 className="text-lg font-bold text-ink">User Isolation</h3>
-            <p className="mt-3 text-sm text-ink-muted leading-relaxed">
-              Fully isolated accounts using Firebase Auth. Every user gets a private workspace where folders and files are indexed separately.
-            </p>
-          </div>
+            {/* User Isolation - Medium block */}
+            <div className="md:col-span-2 group relative flex flex-col p-8 rounded-[2rem] border border-line bg-bg-raised/20 hover:border-purple-500/40 hover:bg-bg-raised/40 transition-all duration-300 overflow-hidden cursor-default">
+              <span className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ease-out-expo">
+                <ShieldCheck className="h-6 w-6" />
+              </span>
+              <h3 className="text-xl font-bold text-ink">Strict Isolation</h3>
+              <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+                Fully isolated accounts using Firebase Auth. Every user gets a private workspace where folders and files are indexed separately.
+              </p>
+            </div>
 
-          <div className="group flex flex-col items-start p-8 rounded-3xl border border-line bg-bg-raised/20 hover:border-teal-500/40 hover:bg-bg-raised/50 transition-all duration-300 hover:-translate-y-1 active:scale-[0.97] cursor-default">
-            <span className="h-12 w-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ease-out-expo">
-              <Zap className="h-6 w-6" />
-            </span>
-            <h3 className="text-lg font-bold text-ink">Native Previews</h3>
-            <p className="mt-3 text-sm text-ink-muted leading-relaxed">
-              Double-click to preview images, stream videos, read PDFs, or play audio files natively inside our high-fidelity custom media player.
+            {/* Native Previews - Medium block */}
+            <div className="md:col-span-2 group relative flex flex-col p-8 rounded-[2rem] border border-line bg-bg-raised/20 hover:border-teal-500/40 hover:bg-bg-raised/40 transition-all duration-300 overflow-hidden cursor-default">
+              <span className="h-12 w-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 ease-out-expo">
+                <Zap className="h-6 w-6" />
+              </span>
+              <h3 className="text-xl font-bold text-ink">Native Previews</h3>
+              <p className="mt-2 text-sm text-ink-muted leading-relaxed">
+                Double-click to preview images, stream videos, read PDFs, or play audio files natively inside our high-fidelity custom media player.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Trust Row / Testimonial */}
+        <section className="w-full mt-32 border-y border-line/50 bg-bg-subtle/30 py-16 text-center animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
+          <p className="text-sm font-semibold tracking-widest text-ink-muted uppercase mb-8">Trusted by Data Hoarders</p>
+          <div className="flex flex-col items-center justify-center">
+            <div className="flex -space-x-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className={`w-12 h-12 rounded-full border-2 border-bg bg-bg-raised shadow-sm flex items-center justify-center text-xs font-bold text-ink-muted ${i === 1 ? 'z-40 bg-accent/10 text-accent' : i === 2 ? 'z-30' : i === 3 ? 'z-20' : 'z-10'}`}>
+                  U{i}
+                </div>
+              ))}
+            </div>
+            <p className="text-lg md:text-xl font-medium text-ink max-w-2xl px-4 leading-relaxed italic">
+              "TGStore completely replaced my need for paid cloud subscriptions. The interface is incredibly fast, and storing everything on Telegram's CDN is brilliant."
             </p>
           </div>
         </section>

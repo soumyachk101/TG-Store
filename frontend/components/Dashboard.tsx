@@ -571,7 +571,7 @@ export function Dashboard() {
                     </div>
                   ) : (
                     /* GRID VIEW */
-                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                       {files.map((file, fileIdx) => (
                         <div
                           key={file.id}
@@ -585,24 +585,24 @@ export function Dashboard() {
                             setPreviewIndex(fileIdx);
                             setPreviewOpen(true);
                           }}
-                          className="group relative flex flex-col rounded-xl border border-line bg-bg-raised/20 hover:border-line-strong hover:bg-bg-raised/40 cursor-pointer select-none transition-[transform,background-color,border-color,box-shadow] ease-out-expo duration-150 overflow-hidden shadow-xs hover:shadow-md active:scale-[0.97]"
+                          className="group relative flex flex-col rounded-2xl border border-line bg-bg-raised/30 hover:border-accent/40 hover:bg-bg-raised/60 cursor-pointer select-none transition-[transform,background-color,border-color,box-shadow] ease-out-expo duration-300 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.97]"
                         >
                           {/* File Preview Area / Icon Placeholder */}
-                          <div className="h-28 bg-bg-raised/50 flex items-center justify-center relative border-b border-line/40 group-hover:bg-bg-subtle/30 transition-colors">
-                            <span className="scale-125 select-none p-4 rounded-full bg-bg/40 border border-line/50 text-ink-muted">
+                          <div className="h-32 bg-bg-subtle/50 flex items-center justify-center relative border-b border-line/40 group-hover:bg-accent/5 transition-colors duration-300">
+                            <span className="scale-150 select-none p-5 rounded-full bg-bg border border-line shadow-sm text-ink-muted group-hover:scale-110 group-hover:text-accent group-hover:border-accent/30 transition-[transform,color,border-color] duration-300 ease-out-expo">
                               {getFileIcon(file.mime_type)}
                             </span>
 
                             {/* Floating overlay quick actions */}
-                            <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1">
+                            <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex gap-1.5">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleFileDownload(file);
                                 }}
-                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
+                                className="rounded-full bg-bg/80 backdrop-blur-md p-1.5 text-ink-muted hover:text-ink hover:bg-bg border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                               >
-                                <Download className="h-3.5 w-3.5" />
+                                <Download className="h-4 w-4" />
                               </button>
                               <button
                                 onClick={(e) => {
@@ -613,15 +613,15 @@ export function Dashboard() {
                                       : { type: "file", id: file.id }
                                   );
                                 }}
-                                className="rounded-full bg-bg p-1.5 text-ink-muted hover:text-ink border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
+                                className="rounded-full bg-bg/80 backdrop-blur-md p-1.5 text-ink-muted hover:text-ink hover:bg-bg border border-line shadow-sm active:scale-[0.97] transition-[transform,background-color,color] ease-out-expo duration-150"
                               >
-                                <MoreVertical className="h-3.5 w-3.5" />
+                                <MoreVertical className="h-4 w-4" />
                               </button>
                             </div>
 
                             {/* Dropdown in Grid Mode */}
                             {activeDropdown?.type === "file" && activeDropdown.id === file.id && (
-                              <div className="absolute right-2 top-10 z-40 w-36 rounded-lg border border-line bg-bg-raised p-1 shadow-2xl text-left">
+                              <div className="absolute right-2 top-10 z-40 w-40 rounded-xl border border-line bg-bg-raised p-1.5 shadow-2xl text-left animate-in fade-in zoom-in-95 duration-150">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -633,9 +633,9 @@ export function Dashboard() {
                                     });
                                     setActiveDropdown(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-bg-subtle transition-colors"
+                                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-ink hover:bg-bg-subtle transition-colors"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
+                                  <Pencil className="h-3.5 w-3.5 text-ink-muted" />
                                   Rename
                                 </button>
                                 <button
@@ -648,9 +648,9 @@ export function Dashboard() {
                                     });
                                     setActiveDropdown(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-ink hover:bg-bg-subtle transition-colors"
+                                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-ink hover:bg-bg-subtle transition-colors"
                                 >
-                                  <Move className="h-3.5 w-3.5" />
+                                  <Move className="h-3.5 w-3.5 text-ink-muted" />
                                   Move to...
                                 </button>
                                 <button
@@ -661,9 +661,9 @@ export function Dashboard() {
                                     }
                                     setActiveDropdown(null);
                                   }}
-                                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs text-danger hover:bg-danger/10 transition-colors border-t border-line mt-1 pt-1.5"
+                                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-danger hover:bg-danger/10 transition-colors border-t border-line mt-1 pt-2"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
+                                  <Trash2 className="h-3.5 w-3.5 text-danger" />
                                   Delete
                                 </button>
                               </div>
@@ -671,12 +671,14 @@ export function Dashboard() {
                           </div>
 
                           {/* File Details Footer */}
-                          <div className="p-3 flex flex-col gap-0.5">
-                            <span className="truncate text-xs font-semibold text-ink" title={file.name}>
+                          <div className="p-3.5 flex flex-col gap-1">
+                            <span className="truncate text-sm font-semibold text-ink" title={file.name}>
                               {file.name}
                             </span>
-                            <div className="flex justify-between items-center text-[10px] text-ink-faint">
-                              <span>{formatBytes(file.size_bytes)}</span>
+                            <div className="flex justify-between items-center text-[11px] font-medium text-ink-faint">
+                              <span className="bg-bg-subtle px-1.5 py-0.5 rounded text-ink-muted">
+                                {formatBytes(file.size_bytes)}
+                              </span>
                               <span>{timeAgo(file.created_at)}</span>
                             </div>
                           </div>
@@ -689,22 +691,25 @@ export function Dashboard() {
 
               {/* Empty state (both folder and file lists empty) */}
               {folders.length === 0 && files.length === 0 && (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border border-dashed border-line rounded-2xl bg-bg-raised/10">
-                  <UploadCloud className="h-12 w-12 text-ink-faint stroke-[1.2]" />
-                  <h4 className="text-sm font-semibold text-ink mt-4">
-                    {debouncedSearch ? "No files found" : "This folder is empty"}
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-line/60 rounded-3xl bg-bg-raised/10 m-4 shadow-inner">
+                  <div className="h-20 w-20 rounded-full bg-accent/10 flex items-center justify-center mb-6">
+                    <UploadCloud className="h-10 w-10 text-accent animate-pulse" />
+                  </div>
+                  <h4 className="text-xl font-bold text-ink tracking-tight">
+                    {debouncedSearch ? "No files found" : "It's quiet in here..."}
                   </h4>
-                  <p className="text-xs text-ink-muted mt-1 max-w-xs leading-relaxed">
+                  <p className="text-sm text-ink-muted mt-2 max-w-sm leading-relaxed font-medium">
                     {debouncedSearch
-                      ? `No results matched "${debouncedSearch}". Try search keywords.`
-                      : "Drag and drop files onto the dashboard to upload them to this location."}
+                      ? `We couldn't find anything matching "${debouncedSearch}". Try a different keyword.`
+                      : "Drag and drop your files anywhere on this page to securely upload them to your private Telegram CDN."}
                   </p>
                   {!debouncedSearch && (
                     <button
                       onClick={handleTriggerUpload}
-                      className="mt-5 rounded-full bg-accent hover:bg-accent-hover text-white px-5 py-2.5 text-xs font-medium active:scale-[0.97] transition-[transform,background-color] ease-out-expo duration-150 shadow-md"
+                      className="mt-8 rounded-full bg-accent hover:bg-accent-hover text-white px-8 py-3.5 text-sm font-semibold active:scale-[0.97] transition-[transform,background-color] ease-out-expo duration-150 shadow-lg shadow-accent/20 flex items-center gap-2"
                     >
-                      Upload Files
+                      <Upload className="h-4.5 w-4.5" />
+                      Browse Files
                     </button>
                   )}
                 </div>

@@ -171,7 +171,7 @@ function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl select-none flex flex-col gap-6">
+    <div className="w-full max-w-sm select-none flex flex-col gap-6 animate-fade-in-up">
       {/* Title Header */}
       <div className="text-center">
         <h1 className="text-2xl font-bold tracking-tight text-ink">TGStore</h1>
@@ -348,14 +348,53 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-screen place-items-center bg-bg px-4 relative overflow-x-hidden overflow-y-auto py-8">
-      {/* Background blurs */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60vw] h-[60vw] rounded-full bg-accent/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60vw] h-[60vw] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none" />
+    <main className="flex min-h-screen bg-bg overflow-hidden">
+      {/* Left side: Branding / Graphic */}
+      <div className="hidden lg:flex lg:w-1/2 relative bg-bg-raised items-center justify-center overflow-hidden border-r border-line">
+        <div className="absolute inset-0 bg-dot-pattern opacity-30 [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] pointer-events-none" />
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-accent/20 blur-[120px] pointer-events-none animate-float" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none animate-float-delayed" />
+        
+        <div className="relative z-10 flex flex-col items-center text-center p-12">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-8">
+            <svg viewBox="0 0 24 24" className="h-16 w-16 drop-shadow-2xl" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M8.5 4.5L2 15.5H15L8.5 4.5Z" fill="url(#loginGrad1)" />
+              <path d="M15.5 8.5L9 19.5H22L15.5 8.5Z" fill="url(#loginGrad2)" />
+              <path d="M12 2L5.5 13H18.5L12 2Z" fill="url(#loginGrad3)" opacity="0.85" />
+              <defs>
+                <linearGradient id="loginGrad1" x1="2" y1="10" x2="15" y2="10" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#3b82f6" />
+                  <stop offset="1" stopColor="#60a5fa" />
+                </linearGradient>
+                <linearGradient id="loginGrad2" x1="9" y1="14" x2="22" y2="14" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#10b981" />
+                  <stop offset="1" stopColor="#34d399" />
+                </linearGradient>
+                <linearGradient id="loginGrad3" x1="5.5" y1="7.5" x2="18.5" y2="7.5" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#8b5cf6" />
+                  <stop offset="1" stopColor="#a78bfa" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <h1 className="text-4xl font-extrabold text-ink tracking-tight mb-4">TGStore</h1>
+          <p className="text-lg text-ink-muted max-w-sm font-medium">
+            Your personal, unlimited cloud drive powered by Telegram CDN.
+          </p>
+        </div>
+      </div>
 
-      <Suspense fallback={<div className="text-sm text-ink-muted flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}>
-        <LoginForm />
-      </Suspense>
+      {/* Right side: Form Container */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 relative">
+        {/* Mobile ambient glow */}
+        <div className="absolute top-[-20%] left-[-20%] w-[60vw] h-[60vw] rounded-full bg-accent/5 blur-[120px] pointer-events-none lg:hidden" />
+        <div className="absolute bottom-[-20%] right-[-20%] w-[60vw] h-[60vw] rounded-full bg-purple-500/5 blur-[120px] pointer-events-none lg:hidden" />
+        
+        <Suspense fallback={<div className="text-sm text-ink-muted flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}>
+          <LoginForm />
+        </Suspense>
+      </div>
     </main>
   );
 }

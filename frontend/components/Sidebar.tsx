@@ -49,10 +49,12 @@ export function Sidebar({ activeTab, setActiveTab, onNewFolder, onUploadClick }:
       <div className="relative" ref={menuRef}>
         <button
           onClick={() => setNewMenuOpen(!newMenuOpen)}
-          className="flex items-center gap-3 rounded-2xl bg-bg-raised border border-line px-6 py-4 shadow-md hover:shadow-lg text-ink font-medium text-sm transition-all hover:bg-bg-subtle active:scale-95 duration-150"
+          className="flex items-center justify-between w-full rounded-2xl bg-accent hover:bg-accent-hover text-white px-6 py-4 shadow-lg shadow-accent/20 font-semibold text-sm transition-[transform,background-color] ease-out-expo active:scale-[0.97] duration-150"
         >
-          <Plus className="h-5 w-5 text-accent animate-pulse" />
-          <span>New</span>
+          <div className="flex items-center gap-3">
+            <Plus className="h-5 w-5" />
+            <span>New</span>
+          </div>
         </button>
 
         {newMenuOpen && (
