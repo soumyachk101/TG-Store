@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useDropzone } from "react-dropzone";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Folder,
   File,
@@ -571,22 +572,28 @@ export function Dashboard() {
                     </div>
                   ) : (
                     /* GRID VIEW */
-                    <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                      {files.map((file, fileIdx) => (
-                        <div
-                          key={file.id}
-                          onClick={() => {
-                            if (window.innerWidth < 768) {
+                    <motion.div layout className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                      <AnimatePresence mode="popLayout">
+                        {files.map((file, fileIdx) => (
+                          <motion.div
+                            layout
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.2 }}
+                            key={file.id}
+                            onClick={() => {
+                              if (window.innerWidth < 768) {
+                                setPreviewIndex(fileIdx);
+                                setPreviewOpen(true);
+                              }
+                            }}
+                            onDoubleClick={() => {
                               setPreviewIndex(fileIdx);
                               setPreviewOpen(true);
-                            }
-                          }}
-                          onDoubleClick={() => {
-                            setPreviewIndex(fileIdx);
-                            setPreviewOpen(true);
-                          }}
-                          className="group relative flex flex-col rounded-2xl border border-line bg-bg-raised/30 hover:border-accent/40 hover:bg-bg-raised/60 cursor-pointer select-none transition-[transform,background-color,border-color,box-shadow] ease-out-expo duration-300 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.97]"
-                        >
+                            }}
+                            className="group relative flex flex-col rounded-2xl border border-line bg-bg-raised/30 hover:border-accent/40 hover:bg-bg-raised/60 cursor-pointer select-none transition-[border-color,box-shadow,background-color] ease-out-expo duration-300 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 active:scale-[0.97]"
+                          >
                           {/* File Preview Area / Icon Placeholder */}
                           <div className="h-32 bg-bg-subtle/50 flex items-center justify-center relative border-b border-line/40 group-hover:bg-accent/5 transition-colors duration-300">
                             <span className="scale-150 select-none p-5 rounded-full bg-bg border border-line shadow-sm text-ink-muted group-hover:scale-110 group-hover:text-accent group-hover:border-accent/30 transition-[transform,color,border-color] duration-300 ease-out-expo">
@@ -682,9 +689,10 @@ export function Dashboard() {
                               <span>{timeAgo(file.created_at)}</span>
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       ))}
-                    </div>
+                      </AnimatePresence>
+                    </motion.div>
                   )}
                 </div>
               )}
@@ -720,8 +728,14 @@ export function Dashboard() {
       </div>
 
       {/* Floating Uploads Progress Widget */}
-      {uploadingItems.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 w-80 space-y-2 rounded-xl border border-line bg-bg-raised p-4 shadow-2xl select-none animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <AnimatePresence>
+        {uploadingItems.length > 0 && (
+          <motion.div 
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-4 right-4 z-50 w-80 space-y-2 rounded-xl border border-line bg-bg-raised p-4 shadow-2xl select-none"
+          >
           <div className="flex items-center justify-between text-xs font-semibold text-ink-muted border-b border-line pb-2 mb-2">
             <span>Uploading {uploadingItems.length} {uploadingItems.length === 1 ? "item" : "items"}</span>
             <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
@@ -745,9 +759,10 @@ export function Dashboard() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Interactive Overlays */}
       <NewFolderModal

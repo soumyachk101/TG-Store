@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { X, Folder, ChevronRight, FolderPlus, ArrowLeft } from "lucide-react";
 import { createFolder, renameFile, renameFolder, moveFile, listFolders } from "@/lib/api";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface NewFolderModalProps {
   isOpen: boolean;
@@ -37,21 +38,23 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (trimmed) {
-      setError(null);
-      mutation.mutate(trimmed);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity duration-200">
-      <div className="w-full max-w-md transform rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl transition-all duration-200 scale-100">
-        <div className="flex items-center justify-between border-b border-line pb-3">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="w-full max-w-md rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
           <h3 className="text-lg font-medium text-ink">New folder</h3>
           <button
             onClick={onClose}
@@ -92,10 +95,13 @@ export function NewFolderModal({ isOpen, onClose, parentId }: NewFolderModalProp
             >
               {mutation.isPending ? "Creating..." : "Create"}
             </button>
+            </button>
           </div>
         </form>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -130,20 +136,23 @@ export function RenameModal({ isOpen, onClose, itemId, itemType, initialName }: 
     },
   });
 
-  if (!isOpen) return null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = name.trim();
-    if (trimmed && trimmed !== initialName) {
-      mutation.mutate(trimmed);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity duration-200">
-      <div className="w-full max-w-md transform rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl transition-all duration-200 scale-100">
-        <div className="flex items-center justify-between border-b border-line pb-3">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="w-full max-w-md rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3">
           <h3 className="text-lg font-medium text-ink">Rename</h3>
           <button
             onClick={onClose}
@@ -177,10 +186,13 @@ export function RenameModal({ isOpen, onClose, itemId, itemType, initialName }: 
             >
               {mutation.isPending ? "Renaming..." : "OK"}
             </button>
+            </button>
           </div>
         </form>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -222,26 +234,23 @@ export function MoveModal({ isOpen, onClose, fileId, fileName, currentFolderId }
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
-  const navigateTo = (id: string, name: string) => {
-    setNavStack([...navStack, { id, name }]);
-  };
-
-  const navigateBack = () => {
-    if (navStack.length > 1) {
-      setNavStack(navStack.slice(0, -1));
-    }
-  };
-
-  const handleMove = () => {
-    moveMutation.mutate(activeFolder.id);
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm transition-opacity duration-200">
-      <div className="w-full max-w-md transform rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl transition-all duration-200 scale-100 flex flex-col max-h-[80vh]">
-        <div className="flex items-center justify-between border-b border-line pb-3 shrink-0">
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="w-full max-w-md rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl flex flex-col max-h-[80vh]"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3 shrink-0">
           <div>
             <h3 className="text-lg font-medium text-ink">Move &ldquo;{fileName}&rdquo;</h3>
             <p className="text-xs text-ink-muted mt-0.5">Choose target location</p>
@@ -334,7 +343,9 @@ export function MoveModal({ isOpen, onClose, fileId, fileName, currentFolderId }
             </button>
           </div>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
