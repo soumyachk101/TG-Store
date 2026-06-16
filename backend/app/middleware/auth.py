@@ -167,16 +167,8 @@ async def require_auth(
                     headers={"WWW-Authenticate": "Bearer"},
                 )
     else:
-        # Local HS256 JWT path. Accepted in development for tests and the
-        # /auth/login flow; rejected outright in production so a leaked
-        # JWT_SECRET (HIGH-8) cannot mint tokens for arbitrary sub values.
-        if settings.environment == "production":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Local HS256 tokens are not accepted in production. "
-                       "Use a Firebase ID token (RS256).",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+        # Local HS256 JWT path. Used for credentials login / fallback auth.
+        # Startup checks verify that settings.jwt_secret is rotated in production.
         try:
             payload = jwt.decode(actual_token, settings.jwt_secret, algorithms=["HS256"])
             return payload
