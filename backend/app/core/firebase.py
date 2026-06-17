@@ -6,7 +6,9 @@ import os
 import firebase_admin
 from firebase_admin import credentials
 from app.core.config import get_settings
+import logging
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -20,7 +22,7 @@ def initialize_firebase():
         pass
 
     if settings.firebase_mock_auth:
-        print("INFO: Firebase Mock Authentication is active. Admin SDK initialization skipped.")
+        logger.info("Firebase Mock Authentication is active. Admin SDK initialization skipped.")
         return
 
     # 1. Check Path configuration
@@ -30,10 +32,10 @@ def initialize_firebase():
             try:
                 cred = credentials.Certificate(path)
                 firebase_admin.initialize_app(cred)
-                print(f"INFO: Firebase initialized successfully using service account JSON path: {path}")
+                logger.info(f"Firebase initialized successfully using service account JSON path: {path}")
                 return
             except Exception as e:
-                print(f"WARNING: Failed to initialize Firebase using path {path}: {e}")
+                logger.warning(f"Failed to initialize Firebase using path {path}: {e}")
         else:
             # Try to resolve relative to backend package root
             # __file__ is backend/app/core/firebase.py -> backend/
@@ -43,10 +45,10 @@ def initialize_firebase():
                 try:
                     cred = credentials.Certificate(alternative_path)
                     firebase_admin.initialize_app(cred)
-                    print(f"INFO: Firebase initialized successfully using resolved service account JSON path: {alternative_path}")
+                    logger.info(f"Firebase initialized successfully using resolved service account JSON path: {alternative_path}")
                     return
                 except Exception as e:
-                    print(f"WARNING: Failed to initialize Firebase using resolved path {alternative_path}: {e}")
+                    logger.warning(f"Failed to initialize Firebase using resolved path {alternative_path}: {e}")
 
     # 2. Check JSON string configuration
     if settings.firebase_service_account_json:
@@ -54,10 +56,10 @@ def initialize_firebase():
             info = json.loads(settings.firebase_service_account_json)
             cred = credentials.Certificate(info)
             firebase_admin.initialize_app(cred)
-            print("INFO: Firebase initialized successfully using service account credentials JSON string.")
+            logger.info("Firebase initialized successfully using service account credentials JSON string.")
             return
         except Exception as e:
-            print(f"WARNING: Failed to parse/use firebase_service_account_json env: {e}")
+            logger.warning(f"Failed to parse/use firebase_service_account_json env: {e}")
 
     # 3. Fallback to Application Default Credentials (ADC) or credentials file in standard path
     has_gcp_creds = "GOOGLE_APPLICATION_CREDENTIALS" in os.environ
@@ -66,14 +68,14 @@ def initialize_firebase():
     if has_gcp_creds or has_gcp_env:
         try:
             firebase_admin.initialize_app()
-            print("INFO: Firebase initialized using Application Default Credentials (ADC).")
+            logger.info("Firebase initialized using Application Default Credentials (ADC).")
         except Exception as e:
             if settings.firebase_service_account_path:
-                print(f"WARNING: Firebase service account path not found at: {settings.firebase_service_account_path}")
-            print(f"WARNING: Could not initialize Firebase Admin SDK natively ({e}). "
+                logger.warning(f"Firebase service account path not found at: {settings.firebase_service_account_path}")
+            logger.warning(f"Could not initialize Firebase Admin SDK natively ({e}). "
                   "Requests requiring token verification will fail unless mock auth is enabled.")
     else:
-        print("INFO: Firebase is not configured (no service account JSON, path file, or GCP environment). "
+        logger.info("Firebase is not configured (no service account JSON, path file, or GCP environment). "
               "Token verification via Firebase will be inactive, falling back to local JWT.")
 
 

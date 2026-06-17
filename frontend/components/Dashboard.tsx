@@ -108,6 +108,11 @@ export function Dashboard() {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      // Don't hijack shortcuts while a modal is open — typing `n` into
+      // the New Folder modal name field would otherwise open another.
+      if (previewOpen || newFolderOpen || renameModal.isOpen || moveModal.isOpen) {
+        return;
+      }
       if (e.key === "u" || e.key === "U") {
         document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
       } else if (e.key === "n" || e.key === "N") {
@@ -116,7 +121,7 @@ export function Dashboard() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [previewOpen, newFolderOpen, renameModal.isOpen, moveModal.isOpen]);
 
   // Close mobile dropdown menu on click outside
   useEffect(() => {
@@ -196,7 +201,7 @@ export function Dashboard() {
         alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
         continue;
       }
-      const id = crypto.randomUUID();
+      const id = crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
       setUploadingItems((cur) => [...cur, { id, name: file.name, pct: 0, size: file.size }]);
 
       uploadMutation.mutate(
@@ -236,8 +241,7 @@ export function Dashboard() {
   };
 
   const handleFileDownload = (file: FileItem) => {
-    const token = session?.apiToken ?? "";
-    const url = token ? `${streamUrl(file.id)}?token=${encodeURIComponent(token)}` : streamUrl(file.id);
+    const url = streamUrl(file.id);
     const a = document.createElement("a");
     a.href = url;
     a.download = file.name;

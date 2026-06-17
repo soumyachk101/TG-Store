@@ -6,15 +6,21 @@ Depends(require_auth). Tokens are HS256-signed with JWT_SECRET.
 
 from __future__ import annotations
 
+import json
+import logging
+import secrets
+import time
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import jwt
 
 from app.core.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # tokenUrl is for OpenAPI docs only — actual auth is JSON-based, not OAuth form.
@@ -38,24 +44,18 @@ def create_access_token(subject: str) -> tuple[str, int]:
     return token, expire_seconds
 
 
-import secrets
-
-
 def verify_credentials(username: str, password: str) -> bool:
     """Constant-time comparison against env-var credentials.
 
     For a single-user personal storage this is the right level — see PRD §3.6.
     """
     if not settings.admin_username or not settings.admin_password:
-        # In dev without configured creds, allow a fallback so the app boots.
-        # In prod this branch is never hit (deploy checklist enforces it).
+        if settings.environment == "development":
+            logger.warning("ADMIN creds unset in dev; allowing any login")
+            return True
         return False
     return secrets.compare_digest(username, settings.admin_username) and secrets.compare_digest(password, settings.admin_password)
 
-
-import urllib.request
-import json
-import time
 
 _google_certs_cache: dict[str, str] = {}
 _google_certs_expires_at: float = 0.0
@@ -92,7 +92,15 @@ def verify_firebase_token_manually(token: str) -> dict[str, Any]:
     if not aud:
         raise ValueError("No audience (aud) found in token claims")
 
-    if settings.firebase_project_id and aud != settings.firebase_project_id:
+    # Audience must match the configured Firebase project ID. If the project
+    # ID itself is unset in production, the production_safety_checks validator
+    # in core.config would have already failed at boot. This check is a
+    # defense-in-depth gate for dev/test runs.
+    if not settings.firebase_project_id:
+        raise ValueError(
+            "Server has no FIREBASE_PROJECT_ID configured; cannot verify audience"
+        )
+    if aud != settings.firebase_project_id:
         raise ValueError(
             f"Token audience '{aud}' does not match configured Firebase project ID '{settings.firebase_project_id}'"
         )
@@ -127,12 +135,10 @@ async def require_auth(
     actual_token = token
 
     if settings.firebase_mock_auth:
-        if settings.environment == "production":
-            # CRIT-3: mock auth must never be reachable on a public deploy.
-            # Return 401 rather than 500 to avoid hinting at a misconfig.
+        if settings.environment not in {"development", "test"}:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Mock auth is disabled in production",
+                detail="Mock auth is disabled outside development/test",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return {
@@ -161,21 +167,40 @@ async def require_auth(
             try:
                 return verify_firebase_token_manually(actual_token)
             except Exception as manual_exc:
+                # Some Firebase SDK exceptions embed the raw token or user
+                # email; log the exception type only, never its str() value.
+                logger.warning(
+                    "Invalid Firebase token (sdk_err=%s, manual_err=%s).",
+                    type(firebase_exc).__name__,
+                    type(manual_exc).__name__,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail=f"Invalid or expired Firebase token. SDK error: {firebase_exc} (Manual check: {manual_exc})",
+                    detail="Invalid or expired token",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
     else:
-        # Local HS256 JWT path. Used for credentials login / fallback auth.
-        # Startup checks verify that settings.jwt_secret is rotated in production.
+        # Local HS256 JWT path. The mock-auth gate above already prevents this
+        # branch from running in production, but mirror that guard here so a
+        # leaked HS256 token can never impersonate a Firebase session in prod
+        # even if the mock-auth branch is ever reordered.
+        if settings.environment not in {"development", "test"}:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Local HS256 tokens are disabled in production",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
         try:
             payload = jwt.decode(actual_token, settings.jwt_secret, algorithms=["HS256"])
             return payload
         except Exception as local_exc:
+            # Log type only — jwt exception messages can include the raw token.
+            logger.warning(
+                "Invalid local token (%s).", type(local_exc).__name__
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid or expired local token. Error: {local_exc}",
+                detail="Invalid or expired token",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 

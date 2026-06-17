@@ -36,6 +36,19 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== "undefined") {
+      // Avoid redirect loops if already on login
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?expired=1";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // --- Files ---
 
 export interface UploadArgs {
@@ -87,9 +100,9 @@ export async function moveFile(id: string, folderId: string | null): Promise<Fil
   return r.data;
 }
 
-/** Returns a URL that, when fetched with the bearer token, streams file bytes. */
+/** Returns a URL that proxies file bytes through the Next.js route handler. */
 export function streamUrl(id: string): string {
-  return `${API_URL}/files/${id}/stream`;
+  return `/files/${id}/stream`;
 }
 
 // --- Folders ---

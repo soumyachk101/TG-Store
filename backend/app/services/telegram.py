@@ -59,11 +59,13 @@ async def _retry(
         except httpx.TransportError as exc:
             last_exc = exc
             delay = base_delay * (2**attempt)
+            # NEVER log `exc` (httpx exception __str__ includes the request
+            # URL, which embeds the bot token). Log the type only.
             logger.warning(
                 "Telegram call failed (attempt %d/%d): %s — retrying in %.2fs",
                 attempt + 1,
                 attempts,
-                exc,
+                type(exc).__name__,
                 delay,
             )
             await asyncio.sleep(delay)
@@ -71,11 +73,14 @@ async def _retry(
             if 500 <= exc.response.status_code < 600:
                 last_exc = exc
                 delay = base_delay * (2**attempt)
+                # See above: do not log `exc`. Include the status code only,
+                # which is useful for diagnosing Telegram 5xx patterns.
                 logger.warning(
-                    "Telegram 5xx (attempt %d/%d): %s — retrying in %.2fs",
+                    "Telegram 5xx (attempt %d/%d, status=%d): %s — retrying in %.2fs",
                     attempt + 1,
                     attempts,
-                    exc,
+                    exc.response.status_code,
+                    type(exc).__name__,
                     delay,
                 )
                 await asyncio.sleep(delay)
@@ -163,4 +168,6 @@ async def delete_message(message_id: int) -> None:
         await _retry(_do)
     except Exception as exc:
         # Soft-fail: storage cleanup should never block a delete response.
-        logger.warning("deleteMessage failed permanently: %s", exc)
+        # Log the exception type only — httpx error strings embed the request URL
+        # (which embeds the bot token).
+        logger.warning("deleteMessage failed permanently: %s", type(exc).__name__)

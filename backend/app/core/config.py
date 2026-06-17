@@ -123,7 +123,7 @@ class Settings(BaseSettings):
     # "development" (default) skips the fail-closed safety checks below so
     # the local dev loop still works with .env.example values.
     environment: str = Field(
-        default="development",
+        default="production",
         description="Runtime environment: 'development' or 'production'. "
                     "Triggers fail-closed checks at startup.",
     )
@@ -141,7 +141,9 @@ class Settings(BaseSettings):
         /auth/login. This validator makes that misconfiguration impossible
         in production.
         """
-        if self.environment != "production":
+        if self.environment == "development":
+            import logging
+            logging.getLogger(__name__).warning("Running in development mode with safety checks disabled")
             return self
         if self.firebase_mock_auth:
             raise ValueError(
@@ -164,6 +166,12 @@ class Settings(BaseSettings):
                 "or FIREBASE_SERVICE_ACCOUNT_JSON to be set. "
                 "Firebase token verification will otherwise fall through to "
                 "the HS256 path, which is disabled in production."
+            )
+        if not self.firebase_project_id:
+            raise ValueError(
+                "FIREBASE_PROJECT_ID must be set in production. The audience "
+                "check on every Firebase token relies on it; without it "
+                "tokens for any project would be accepted."
             )
         return self
 

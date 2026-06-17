@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import quote
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi import File as FastAPIFile
 from fastapi import Form as FastAPIForm
@@ -78,12 +79,25 @@ async def upload_file(
             detail=f"File exceeds {settings.max_upload_bytes} byte limit",
         )
 
-    content = await file.read()
-    if len(content) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File exceeds {settings.max_upload_bytes} byte limit",
-        )
+    chunks = []
+    total_size = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total_size += len(chunk)
+        if total_size > settings.max_upload_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"File exceeds {settings.max_upload_bytes} byte limit",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
+
+    mime_type = file.content_type or "application/octet-stream"
+    is_safe = mime_type.startswith(("image/", "video/", "audio/")) or mime_type == "application/pdf"
+    if not is_safe:
+        mime_type = "application/octet-stream"
 
     # --- Send to Telegram ---
     original_name = file.filename or "unnamed"
@@ -91,7 +105,7 @@ async def upload_file(
         result = await telegram.send_document(
             filename=original_name,
             content=content,
-            mime=file.content_type or "application/octet-stream",
+            mime=mime_type,
         )
     except Exception as exc:
         # Do not echo Telegram error details (may include token leakage)
@@ -127,7 +141,7 @@ async def upload_file(
     db_file = File(
         name=original_name,
         original_name=original_name,
-        mime_type=file.content_type,
+        mime_type=mime_type,
         size_bytes=len(content),
         folder_id=parsed_folder_id,
         tg_file_id=tg_file_id,
@@ -289,8 +303,6 @@ async def stream_file(
         tg_url = await telegram.get_download_url(row.tg_file_id)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="Storage unavailable") from exc
-
-    import httpx
 
     async def _iter():
         async with httpx.AsyncClient(timeout=300.0, follow_redirects=True) as client:

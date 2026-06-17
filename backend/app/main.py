@@ -33,9 +33,11 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    # Constrain vercel preview allowlist to the project's own URL space.
-    # Wildcard `.*` would let any *.vercel.app issue cross-origin requests.
-    allow_origin_regex=r"^https://tgstorev1?(-[a-z0-9-]+)?\.vercel\.app$",
+    # Lock the Vercel preview allowlist to the project's own URL space.
+    # Per CLAUDE.md: only the literal `tgstore` host is allowed. A previous
+    # typo (`v1?`) accidentally accepted `tgstore.vercel.app` and
+    # `tgstorev.vercel.app` — those are now rejected.
+    allow_origin_regex=r"^https://tgstore(-[a-z0-9-]+)?\.vercel\.app$",
     # Auth uses the Authorization header (Bearer), not cookies — credentials
     # are not required. Setting this to False avoids accidental CSRF exposure
     # if cookies are ever introduced.

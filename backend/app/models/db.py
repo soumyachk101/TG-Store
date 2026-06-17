@@ -118,7 +118,7 @@ class File(Base):
 
     folder_id: Mapped[uuid.UUID | None] = mapped_column(
         GUID(),
-        ForeignKey("folders.id", ondelete="SET NULL"),
+        ForeignKey("folders.id", ondelete="RESTRICT"),
         nullable=True,
     )
 
@@ -158,7 +158,11 @@ class File(Base):
             "mime_type",
             postgresql_where=text("deleted_at IS NULL"),
         ),
-        Index("idx_files_name_trgm", "name"),
+        # No `idx_files_name_trgm` here on purpose. Filename search uses
+        # ILIKE '%name%' and does not benefit from a plain btree index.
+        # For a personal-scale corpus the seq scan is fine; if file count
+        # grows past ~100k, add a GIN trigram (`pg_trgm`) index in a
+        # follow-up migration.
     )
 
     @property

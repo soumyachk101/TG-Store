@@ -33,11 +33,22 @@ const nextConfig = {
               "font-src 'self' data: https:",
               "img-src 'self' data: blob: https://api.telegram.org",
               "media-src 'self' blob: https://api.telegram.org",
-              `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://api.telegram.org http://localhost:8000 https://tg-store-production-962c.up.railway.app ${
-                process.env.NEXT_PUBLIC_API_URL || ""
-              } ${
-                process.env.NODE_ENV === "development" ? "ws: wss:" : ""
-              }`.replace(/\s+/g, " ").trim(),
+              // Build connect-src from env so the CSP stays in lockstep
+              // with the actual API origin. The hard-coded Railway slug
+              // and firebaseio.com wildcard are gone; localhost is only
+              // included in development.
+              [
+                "connect-src 'self'",
+                "https://*.googleapis.com",
+                "https://*.firebaseapp.com",
+                "https://api.telegram.org",
+                process.env.NEXT_PUBLIC_API_URL || "",
+                ...(process.env.NODE_ENV === "development"
+                  ? ["http://localhost:8000", "ws:", "wss:"]
+                  : []),
+              ]
+                .filter(Boolean)
+                .join(" "),
               "frame-src 'self' https://*.firebaseapp.com",
               "object-src 'none'",
               "base-uri 'self'",

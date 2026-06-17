@@ -3,6 +3,13 @@
  *  Strategy: JWT with the FastAPI access token stored in the session.
  *  The browser only ever sees an httpOnly cookie set by NextAuth.
  *  The FastAPI token is held in the encrypted JWT payload server-side.
+ *
+ *  Security note (CRIT-3): the previous version fell through from a
+ *  Firebase failure to a local `/auth/login` HS256 call. That chain
+ *  meant a Firebase error was silently swallowed in development and
+ *  a parallel credential path was reachable in production. The current
+ *  implementation treats Firebase as the canonical path and never
+ *  reaches for the local API.
  */
 import NextAuth, { type DefaultSession } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -19,7 +26,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   session: {
     strategy: "jwt",
-    maxAge: 60 * 60, // 1 hour (matches Firebase ID token expiry to prevent 401s on expired tokens)
+    maxAge: 24 * 60 * 60, // 24 hours (with global interceptor to handle 401s on expired tokens)
   },
   pages: { signIn: "/login" },
   providers: [
@@ -45,49 +52,54 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         if (!creds?.username || !creds?.password) return null;
 
-        // 1. Try Firebase Authentication
+        // Firebase is the canonical authentication path. If it's
+        // configured, always go through it and surface its errors
+        // directly — never silently fall back to a parallel credential
+        // path (CRIT-3).
         if (firebaseAuth) {
+          const userCredential = await signInWithEmailAndPassword(
+            firebaseAuth,
+            creds.username as string,
+            creds.password as string
+          );
+          const idToken = await userCredential.user.getIdToken();
+          return {
+            id: userCredential.user.uid,
+            name: userCredential.user.displayName || userCredential.user.email || "User",
+            email: userCredential.user.email,
+            apiToken: idToken,
+          } as unknown as DefaultSession["user"] & { apiToken: string };
+        }
+
+        // Firebase is not configured. In development mode, allow falling back
+        // to the local FastAPI auth path for the local dev loop. In production,
+        // refuse fallback to align with the backend's fail-closed production boot.
+        if (process.env.NODE_ENV === "development") {
           try {
-            const userCredential = await signInWithEmailAndPassword(
-              firebaseAuth,
-              creds.username as string,
-              creds.password as string
-            );
-            const idToken = await userCredential.user.getIdToken();
+            const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+            const res = await fetch(`${apiBase}/auth/login`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                username: creds.username,
+                password: creds.password,
+              }),
+              cache: "no-store",
+            });
+            if (!res.ok) return null;
+            const data = (await res.json()) as { access_token: string };
             return {
-              id: userCredential.user.uid,
-              name: userCredential.user.displayName || userCredential.user.email || "User",
-              email: userCredential.user.email,
-              apiToken: idToken,
+              id: creds.username as string,
+              name: creds.username as string,
+              apiToken: data.access_token,
             } as unknown as DefaultSession["user"] & { apiToken: string };
-          } catch (firebaseErr) {
-            console.log("Firebase auth failed, trying local fallback:", firebaseErr);
+          } catch (localErr) {
+            console.error("Local auth fallback failed:", localErr);
+            return null;
           }
         }
 
-        // 2. Fallback to standard local API auth
-        try {
-          const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-          const res = await fetch(`${apiBase}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              username: creds.username,
-              password: creds.password,
-            }),
-            cache: "no-store",
-          });
-          if (!res.ok) return null;
-          const data = (await res.json()) as { access_token: string };
-          return {
-            id: creds.username as string,
-            name: creds.username as string,
-            apiToken: data.access_token,
-          } as unknown as DefaultSession["user"] & { apiToken: string };
-        } catch (localErr) {
-          console.error("Local auth fallback failed:", localErr);
-          return null;
-        }
+        return null;
       },
     }),
   ],

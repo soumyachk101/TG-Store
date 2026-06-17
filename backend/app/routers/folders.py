@@ -45,9 +45,9 @@ async def create_folder(
         ).scalar_one_or_none()
         if parent is None:
             raise HTTPException(status_code=404, detail="Parent folder not found")
-        # PRD §3.3: max 3 levels deep
+        # PRD §3.3: max 3 levels deep (root + 2 nested)
         depth = parent.path.strip("/").count("/") + 1
-        if depth >= 3:
+        if depth > 2:
             raise HTTPException(
                 status_code=400, detail="Maximum folder depth (3) reached"
             )
@@ -114,34 +114,45 @@ async def delete_folder(
     db: AsyncSession = Depends(get_db),
     _claims: dict = Depends(require_auth),
 ) -> DeleteResponse:
-    """Delete a folder. Must be empty (no files, no subfolders)."""
-    row = (
-        await db.execute(
-            select(Folder).where(
-                Folder.id == folder_id, Folder.user_id == _claims["sub"]
+    """Delete a folder. Must be empty (no files, no subfolders).
+
+    Wrapped in an explicit transaction with SELECT ... FOR UPDATE on the
+    folder row to close the race between the emptiness check and the
+    delete: a concurrent upload or subfolder create would otherwise be
+    able to slip in between the SELECTs and the DELETE.
+    """
+    async with db.begin():
+        # Lock the folder row for the duration of the transaction.
+        row = (
+            await db.execute(
+                select(Folder)
+                .where(
+                    Folder.id == folder_id, Folder.user_id == _claims["sub"]
+                )
+                .with_for_update()
             )
-        )
-    ).scalar_one_or_none()
-    if row is None:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    has_children = (
-        await db.execute(
-            select(Folder.id).where(Folder.parent_id == folder_id).limit(1)
-        )
-    ).scalar_one_or_none()
-    if has_children:
-        raise HTTPException(
-            status_code=400, detail="Folder is not empty (has subfolders)"
-        )
-    has_files = (
-        await db.execute(
-            select(File.id)
-            .where(File.folder_id == folder_id, File.deleted_at.is_(None))
-            .limit(1)
-        )
-    ).scalar_one_or_none()
-    if has_files:
-        raise HTTPException(status_code=400, detail="Folder is not empty (has files)")
-    await db.delete(row)
-    await db.commit()
+        ).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        has_children = (
+            await db.execute(
+                select(Folder.id).where(Folder.parent_id == folder_id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if has_children:
+            raise HTTPException(
+                status_code=400, detail="Folder is not empty (has subfolders)"
+            )
+        has_files = (
+            await db.execute(
+                select(File.id)
+                .where(File.folder_id == folder_id, File.deleted_at.is_(None))
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if has_files:
+            raise HTTPException(
+                status_code=400, detail="Folder is not empty (has files)"
+            )
+        await db.delete(row)
     return DeleteResponse(success=True, id=folder_id)
