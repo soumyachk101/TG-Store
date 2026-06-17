@@ -40,6 +40,17 @@ class Settings(BaseSettings):
                 return v.replace("postgresql://", "postgresql+psycopg2://", 1)
         return v
 
+    @model_validator(mode="before")
+    @classmethod
+    def log_input_keys(cls, data: Any) -> Any:
+        import os
+        # Print directly to stdout using print() to guarantee visibility in Railway build logs 
+        # before the main logging configuration has initialized.
+        print(f"DEBUG_ENV_KEYS: OS environment Firebase keys: {[k for k in os.environ.keys() if 'FIREBASE' in k.upper()]}")
+        if isinstance(data, dict):
+            print(f"DEBUG_ENV_KEYS: Pydantic loaded Firebase settings keys: {[k for k in data.keys() if 'firebase' in k.lower()]}")
+        return data
+
     @model_validator(mode="after")
     def derive_sync_url(self) -> "Settings":
         default_sync = "postgresql+psycopg2://tgstore:tgstore@localhost:5432/tgstore"
