@@ -27,19 +27,33 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   try {
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
     const upstream = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/files/${id}/stream`,
-      { headers: forwardHeaders }
+      `${apiBase}/files/${id}/stream`,
+      {
+        headers: forwardHeaders,
+        cache: "no-store",
+      }
     );
 
-    // Pass through the upstream status (e.g. 206 for partial content)
-    // and the full Headers object so Content-Range, Accept-Ranges,
-    // Content-Length, etc. all make it back to the browser. Previously
-    // only Content-Type and Content-Disposition were forwarded, which
-    // silently broke video scrubbing.
+    // Clean up headers to avoid proxy conflicts (hop-by-hop headers and decompression header mismatches)
+    const outboundHeaders = new Headers();
+    for (const [key, value] of upstream.headers.entries()) {
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey === "connection" ||
+        lowerKey === "keep-alive" ||
+        lowerKey === "transfer-encoding" ||
+        lowerKey === "content-encoding"
+      ) {
+        continue;
+      }
+      outboundHeaders.set(key, value);
+    }
+
     return new Response(upstream.body, {
       status: upstream.status,
-      headers: upstream.headers,
+      headers: outboundHeaders,
     });
   } catch (error) {
     // Do NOT log the error verbatim — its str() can include the

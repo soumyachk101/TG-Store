@@ -157,10 +157,6 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
             src={`${directUrl}#toolbar=0`}
             title={file.name}
             onLoad={() => setLoading(false)}
-            // Defense-in-depth: empty sandbox disables scripts, forms,
-            // top-navigation, and popups inside the PDF iframe. Chromium's
-            // built-in PDF viewer still renders the document.
-            sandbox=""
             className="h-[80vh] w-full max-w-4xl rounded border border-line bg-white shadow-2xl"
           />
         )}
