@@ -215,30 +215,38 @@ export function Dashboard() {
   // Queue files for the review/rename modal. Files with names that
   // collide with already-pending names get a (1), (2), ... suffix so the
   // backend never sees two files with the same name in the same folder.
+  //
+  // We compute the new entries against the *current* pending list (read
+  // from a ref) instead of putting the work inside a setState updater,
+  // because React may run state updaters asynchronously or even call
+  // them more than once — so side effects (or even reading .length) on
+  // an array built inside the updater would be unreliable.
+  const pendingNamesRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    pendingNamesRef.current = new Set(pendingFiles.map((p) => p.name));
+  }, [pendingFiles]);
+
   const queueFilesForReview = (incoming: File[]) => {
     const next: PendingFile[] = [];
-    setPendingFiles((cur) => {
-      const existing = new Set(cur.map((p) => p.name));
-      for (const file of incoming) {
-        if (file.size > MAX_BYTES) {
-          alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
-          continue;
-        }
-        const dot = file.name.lastIndexOf(".");
-        const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
-        const ext = dot > 0 ? file.name.slice(dot) : "";
-        let candidate = file.name;
-        let n = 1;
-        while (existing.has(candidate)) {
-          candidate = `${stem} (${n})${ext}`;
-          n += 1;
-        }
-        existing.add(candidate);
-        next.push({ id: nextUploadId(), file, name: candidate });
+    for (const file of incoming) {
+      if (file.size > MAX_BYTES) {
+        alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
+        continue;
       }
-      return [...cur, ...next];
-    });
+      const dot = file.name.lastIndexOf(".");
+      const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
+      const ext = dot > 0 ? file.name.slice(dot) : "";
+      let candidate = file.name;
+      let n = 1;
+      while (pendingNamesRef.current.has(candidate)) {
+        candidate = `${stem} (${n})${ext}`;
+        n += 1;
+      }
+      pendingNamesRef.current.add(candidate);
+      next.push({ id: nextUploadId(), file, name: candidate });
+    }
     if (next.length > 0) {
+      setPendingFiles((cur) => [...cur, ...next]);
       setPendingModalOpen(true);
     }
   };
