@@ -49,15 +49,19 @@ app.add_middleware(
 
 # Security response headers. CSP is intentionally strict; expand the
 # img-src/media-src set only if a future preview feature needs it.
+# frame-ancestors is scoped to the same Vercel deployment family as
+# the frontend (`*.vercel.app`) so the user's own preview deployments
+# (e.g. tgstorev1.vercel.app) can embed the app for testing, while
+# random third-party sites are still blocked.
 _SECURITY_HEADERS: dict[str, str] = {
     "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "no-referrer",
-    "X-Frame-Options": "DENY",
+    "X-Frame-Options": "SAMEORIGIN",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Content-Security-Policy": (
         "default-src 'none'; "
-        "frame-ancestors 'none'; "
+        "frame-ancestors 'self' https://*.vercel.app; "
         "base-uri 'none'"
     ),
 }

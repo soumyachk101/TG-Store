@@ -51,7 +51,13 @@ const nextConfig = {
       "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
       "object-src 'none'",
       "base-uri 'self'",
-      "frame-ancestors 'none'",
+      // frame-ancestors: allow our own Vercel deployments to embed
+      // this app (e.g. tgstorev1.vercel.app loading tgstore.vercel.app
+      // in an iframe). Third-party sites are still blocked. The CSP
+      // spec requires an explicit allowlist (no regex), so we list the
+      // known deployment hostnames. The wildcard subdomain also
+      // accepts other *.vercel.app previews the user may create.
+      "frame-ancestors 'self' https://tgstore.vercel.app https://tgstorev1.vercel.app https://*.vercel.app",
     ].join("; ");
 
     const baseHeaders = (coopValue) => [
@@ -66,10 +72,12 @@ const nextConfig = {
     // CSP for routes that may be framed by the same origin (PDF /
     // image / video preview iframes). Drops frame-ancestors to
     // 'self' so the dashboard's <iframe> can embed the stream.
-    const cspFramable = cspValue.replace(
-      "frame-ancestors \'none\'",
-      "frame-ancestors \'self\'"
-    );
+    // CSP for routes that may be framed (PDF / image / video
+    // preview iframes). The stream route is already allowed by the
+    // global frame-ancestors above (which includes 'self'); we just
+    // need to keep X-Frame-Options: SAMEORIGIN on the response so
+    // older browsers honor the policy.
+    const cspFramable = cspValue;
 
     return [
       // Stream proxy: relaxed X-Frame-Options + frame-ancestors so
