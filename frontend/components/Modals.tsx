@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X, Folder, ChevronRight, FolderPlus, ArrowLeft } from "lucide-react";
+import { X, Folder, ChevronRight, FolderPlus, ArrowLeft, File as FileIcon, Trash2, Upload as UploadIcon } from "lucide-react";
 import { createFolder, renameFile, renameFolder, moveFile, listFolders } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -372,6 +372,200 @@ export function MoveModal({ isOpen, onClose, fileId, fileName, currentFolderId }
             </button>
           </div>
         </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+export interface PendingFile {
+  id: string;
+  file: File;
+  name: string;
+}
+
+interface PendingFilesModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  files: PendingFile[];
+  onUpdateName: (id: string, name: string) => void;
+  onRemove: (id: string) => void;
+  onStartUpload: (files: File[]) => void;
+}
+
+const FORBIDDEN_NAME_CHARS = /[\\/:*?"<>|\u0000-\u001F]/g;
+const MAX_NAME_LENGTH = 255;
+
+function splitName(name: string): { stem: string; ext: string } {
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0 || dot === name.length - 1) {
+    return { stem: name, ext: "" };
+  }
+  return { stem: name.slice(0, dot), ext: name.slice(dot) };
+}
+
+export function PendingFilesModal({
+  isOpen,
+  onClose,
+  files,
+  onUpdateName,
+  onRemove,
+  onStartUpload,
+}: PendingFilesModalProps) {
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrors({});
+    }
+  }, [isOpen]);
+
+  const handleNameChange = (id: string, value: string) => {
+    onUpdateName(id, value);
+    if (errors[id]) {
+      setErrors((cur) => ({ ...cur, [id]: null }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const next: Record<string, string | null> = {};
+    let ok = true;
+    for (const f of files) {
+      const trimmed = f.name.trim();
+      if (!trimmed) {
+        next[f.id] = "Name cannot be empty.";
+        ok = false;
+        continue;
+      }
+      if (trimmed.length > MAX_NAME_LENGTH) {
+        next[f.id] = `Name must be ${MAX_NAME_LENGTH} characters or fewer.`;
+        ok = false;
+        continue;
+      }
+      if (FORBIDDEN_NAME_CHARS.test(trimmed)) {
+        next[f.id] = "Name contains invalid characters.";
+        ok = false;
+        continue;
+      }
+    }
+    setErrors(next);
+    return ok;
+  };
+
+  const handleUpload = () => {
+    if (!validate()) return;
+    const renamed: File[] = files.map((f) => {
+      const finalName = f.name.trim();
+      if (finalName === f.file.name) return f.file;
+      return new File([f.file], finalName, {
+        type: f.file.type,
+        lastModified: f.file.lastModified,
+      });
+    });
+    onStartUpload(renamed);
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="w-full max-w-lg rounded-2xl border border-line bg-bg-raised p-6 shadow-2xl flex flex-col max-h-[80vh]"
+          >
+            <div className="flex items-center justify-between border-b border-line pb-3 shrink-0">
+              <div>
+                <h3 className="text-lg font-medium text-ink">Review files</h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  Rename before uploading. {files.length}{" "}
+                  {files.length === 1 ? "file" : "files"} selected.
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="rounded-full p-1.5 text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-transform"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-3 space-y-2 min-h-[120px]">
+              {files.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <FileIcon className="h-8 w-8 text-ink-faint stroke-[1.5]" />
+                  <p className="mt-2 text-xs text-ink-muted">No files selected</p>
+                </div>
+              )}
+              {files.map((f) => {
+                const { ext } = splitName(f.file.name);
+                return (
+                  <div
+                    key={f.id}
+                    className="rounded-lg border border-line bg-bg p-3 transition-colors focus-within:border-accent"
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileIcon className="h-4 w-4 text-ink-muted shrink-0" />
+                      <input
+                        type="text"
+                        value={f.name}
+                        onChange={(e) => handleNameChange(f.id, e.target.value)}
+                        aria-label={`Name for ${f.file.name}`}
+                        spellCheck={false}
+                        className="flex-1 min-w-0 rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-ink placeholder:text-ink-faint focus:border-line focus:bg-bg-raised focus:outline-none"
+                        placeholder={f.file.name}
+                      />
+                      {ext && (
+                        <span
+                          className="shrink-0 rounded-md bg-bg-subtle px-1.5 py-0.5 text-[10px] font-mono text-ink-muted"
+                          title={`Original extension: ${ext}`}
+                        >
+                          {ext}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onRemove(f.id)}
+                        aria-label={`Remove ${f.file.name}`}
+                        className="shrink-0 rounded-full p-1.5 text-ink-muted hover:bg-danger/10 hover:text-danger active:scale-95 transition-all"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                    {errors[f.id] && (
+                      <p className="mt-1 ml-6 text-[11px] text-danger">{errors[f.id]}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-2 flex justify-end gap-3 border-t border-line pt-4 shrink-0">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full px-4 py-2 text-xs font-medium text-ink-muted hover:bg-bg-subtle hover:text-ink active:scale-95 transition-transform"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUpload}
+                disabled={files.length === 0}
+                className="flex items-center gap-1.5 rounded-full bg-accent px-5 py-2 text-xs font-medium text-white hover:bg-accent-hover disabled:opacity-50 active:scale-95 transition-all"
+              >
+                <UploadIcon className="h-3.5 w-3.5" />
+                Upload {files.length > 0 && `(${files.length})`}
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}

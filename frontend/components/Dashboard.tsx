@@ -35,7 +35,8 @@ import { Sidebar } from "./Sidebar";
 import { listFiles, listFolders, deleteFile, deleteFolder, uploadFile, streamUrl } from "@/lib/api";
 import type { FileItem, Folder as FolderItem } from "@/types";
 import { formatBytes, timeAgo } from "@/lib/format";
-import { NewFolderModal, RenameModal, MoveModal } from "./Modals";
+import { NewFolderModal, RenameModal, MoveModal, PendingFilesModal } from "./Modals";
+import type { PendingFile } from "./Modals";
 import { PreviewModal } from "./PreviewModal";
 
 interface UploadingItem {
@@ -66,6 +67,10 @@ export function Dashboard() {
 
   // Uploading status
   const [uploadingItems, setUploadingItems] = useState<UploadingItem[]>([]);
+
+  // Pending files awaiting user confirmation / rename
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [pendingModalOpen, setPendingModalOpen] = useState(false);
 
   // Modals state
   const [newFolderOpen, setNewFolderOpen] = useState(false);
@@ -207,16 +212,51 @@ export function Dashboard() {
     },
   });
 
+  // Queue files for the review/rename modal. Files with names that
+  // collide with already-pending names get a (1), (2), ... suffix so the
+  // backend never sees two files with the same name in the same folder.
+  const queueFilesForReview = (incoming: File[]) => {
+    const next: PendingFile[] = [];
+    setPendingFiles((cur) => {
+      const existing = new Set(cur.map((p) => p.name));
+      for (const file of incoming) {
+        if (file.size > MAX_BYTES) {
+          alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
+          continue;
+        }
+        const dot = file.name.lastIndexOf(".");
+        const stem = dot > 0 ? file.name.slice(0, dot) : file.name;
+        const ext = dot > 0 ? file.name.slice(dot) : "";
+        let candidate = file.name;
+        let n = 1;
+        while (existing.has(candidate)) {
+          candidate = `${stem} (${n})${ext}`;
+          n += 1;
+        }
+        existing.add(candidate);
+        next.push({ id: nextUploadId(), file, name: candidate });
+      }
+      return [...cur, ...next];
+    });
+    if (next.length > 0) {
+      setPendingModalOpen(true);
+    }
+  };
+
   // Drag-and-drop handlers
   const onDrop = (acceptedFiles: File[]) => {
-    for (const file of acceptedFiles) {
-      if (file.size > MAX_BYTES) {
-        alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
-        continue;
-      }
+    queueFilesForReview(acceptedFiles);
+  };
+
+  // Kick off actual uploads of (possibly renamed) File objects. Re-uses
+  // the existing upload pipeline so progress, invalidation and error
+  // handling stay identical to the pre-rename flow.
+  const startPendingUploads = (renamed: File[]) => {
+    setPendingModalOpen(false);
+    setPendingFiles([]);
+    for (const file of renamed) {
       const id = nextUploadId();
       setUploadingItems((cur) => [...cur, { id, name: file.name, pct: 0, size: file.size }]);
-
       uploadMutation.mutate(
         {
           file,
@@ -297,6 +337,15 @@ export function Dashboard() {
           {...getInputProps({
             style: {},
             ref: fileInputRef,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const files = e.target.files;
+              // Always reset the input so the same file can be picked again.
+              e.target.value = "";
+              if (!files || files.length === 0) return;
+              e.preventDefault();
+              e.stopPropagation();
+              queueFilesForReview(Array.from(files));
+            },
           })}
           className="sr-only"
         />
@@ -792,6 +841,22 @@ export function Dashboard() {
         isOpen={newFolderOpen}
         onClose={() => setNewFolderOpen(false)}
         parentId={currentFolderId}
+      />
+
+      <PendingFilesModal
+        isOpen={pendingModalOpen}
+        onClose={() => {
+          setPendingModalOpen(false);
+          setPendingFiles([]);
+        }}
+        files={pendingFiles}
+        onUpdateName={(id, name) =>
+          setPendingFiles((cur) => cur.map((p) => (p.id === id ? { ...p, name } : p)))
+        }
+        onRemove={(id) =>
+          setPendingFiles((cur) => cur.filter((p) => p.id !== id))
+        }
+        onStartUpload={startPendingUploads}
       />
 
       <RenameModal
