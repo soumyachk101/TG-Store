@@ -322,8 +322,21 @@ export function Dashboard() {
     return <File className="h-4 w-4 text-ink-muted shrink-0" />;
   };
 
+  // Sidebar Upload button + "u" shortcut click this. The dropzone-shared
+  // <input> ignores programmatic clicks because dropzone nulls out its
+  // change handler when noClick is true, so we trigger a *separate*
+  // native file input below.
+  const pickerInputRef = useRef<HTMLInputElement | null>(null);
   const handleTriggerUpload = () => {
-    fileInputRef.current?.click();
+    pickerInputRef.current?.click();
+  };
+
+  const handlePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    // Reset value first so picking the same file again re-fires onChange.
+    e.target.value = "";
+    if (!files || files.length === 0) return;
+    queueFilesForReview(Array.from(files));
   };
 
   const isLoading = filesLoading || foldersLoading;
@@ -337,17 +350,19 @@ export function Dashboard() {
           {...getInputProps({
             style: {},
             ref: fileInputRef,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              const files = e.target.files;
-              // Always reset the input so the same file can be picked again.
-              e.target.value = "";
-              if (!files || files.length === 0) return;
-              e.preventDefault();
-              e.stopPropagation();
-              queueFilesForReview(Array.from(files));
-            },
           })}
           className="sr-only"
+        />
+
+        {/* Separate native file input for the sidebar Upload button.
+            We can't reuse the dropzone <input> because dropzone
+            installs a null onChange handler when noClick is true. */}
+        <input
+          ref={pickerInputRef}
+          type="file"
+          multiple
+          className="sr-only"
+          onChange={handlePickerChange}
         />
 
         {/* Drag overlay indicator */}
