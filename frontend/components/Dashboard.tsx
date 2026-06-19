@@ -341,10 +341,16 @@ export function Dashboard() {
 
   const handlePickerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    // Reset value first so picking the same file again re-fires onChange.
-    e.target.value = "";
     if (!files || files.length === 0) return;
-    queueFilesForReview(Array.from(files));
+    
+    // Copy the files before resetting the input value, because resetting 
+    // the value also clears the live FileList object.
+    const filesArray = Array.from(files);
+    
+    // Reset value so picking the same file again re-fires onChange.
+    e.target.value = "";
+    
+    queueFilesForReview(filesArray);
   };
 
   const isLoading = filesLoading || foldersLoading;
