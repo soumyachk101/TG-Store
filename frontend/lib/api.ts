@@ -38,11 +38,26 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
       // Avoid redirect loops if already on login
       if (!window.location.pathname.startsWith("/login")) {
-        window.location.href = "/login?expired=1";
+        // Clear the NextAuth session so the next sign-in starts fresh.
+        // Without this, the same expired token keeps being sent and the
+        // user gets bounced back to /login?expired=1 repeatedly.
+        try {
+          const { signOut } = await import("next-auth/react");
+          await signOut({ redirect: false });
+        } catch {
+          // Best-effort: if next-auth/react isn't loadable for any reason,
+          // fall through to the hard redirect.
+        }
+        // Append `expired=1` only the first time; if the user lands back
+        // here on subsequent reloads without re-authing, the login page
+        // already shows the "Session expired" banner.
+        const u = new URL("/login", window.location.origin);
+        u.searchParams.set("expired", "1");
+        window.location.replace(u.toString());
       }
     }
     return Promise.reject(error);

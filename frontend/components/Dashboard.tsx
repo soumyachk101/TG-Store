@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useDropzone } from "react-dropzone";
@@ -92,6 +92,19 @@ export function Dashboard() {
     id: string;
   } | null>(null);
 
+  // Refs for triggering the native file picker without relying on a
+  // document.querySelector that may match a stale node after re-render.
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Monotonic counter for upload IDs — avoids the
+  // `Math.random().toString(36).slice(2)` collision risk when several
+  // files are dropped in quick succession.
+  const uploadIdCounter = useRef(0);
+  const nextUploadId = () => {
+    uploadIdCounter.current += 1;
+    // Combine timestamp + counter for a stable, sortable, collision-free ID.
+    return `up-${Date.now().toString(36)}-${uploadIdCounter.current}`;
+  };
+
   // Debounce search query
   useEffect(() => {
     const t = setTimeout(() => {
@@ -114,7 +127,7 @@ export function Dashboard() {
         return;
       }
       if (e.key === "u" || e.key === "U") {
-        document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+        fileInputRef.current?.click();
       } else if (e.key === "n" || e.key === "N") {
         setNewFolderOpen(true);
       }
@@ -201,7 +214,7 @@ export function Dashboard() {
         alert(`"${file.name}" exceeds 2 GB. Cannot upload.`);
         continue;
       }
-      const id = crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
+      const id = nextUploadId();
       setUploadingItems((cur) => [...cur, { id, name: file.name, pct: 0, size: file.size }]);
 
       uploadMutation.mutate(
@@ -270,7 +283,7 @@ export function Dashboard() {
   };
 
   const handleTriggerUpload = () => {
-    document.querySelector<HTMLInputElement>('input[type="file"]')?.click();
+    fileInputRef.current?.click();
   };
 
   const isLoading = filesLoading || foldersLoading;
@@ -280,7 +293,13 @@ export function Dashboard() {
       <TopBar search={search} onSearch={setSearch} />
 
       <div className="flex flex-1 relative" {...getRootProps()}>
-        <input {...getInputProps({ style: {} })} className="sr-only" />
+        <input
+          {...getInputProps({
+            style: {},
+            ref: fileInputRef,
+          })}
+          className="sr-only"
+        />
 
         {/* Drag overlay indicator */}
         {isDragActive && (

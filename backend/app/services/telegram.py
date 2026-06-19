@@ -91,6 +91,42 @@ async def _retry(
     raise last_exc
 
 
+async def send_document_stream(
+    filename: str,
+    content_iter,
+    mime: str,
+    content_length: int,
+) -> dict[str, Any]:
+    """Stream a file upload to Telegram without buffering in memory.
+
+    `content_iter` is an async iterator yielding bytes chunks.
+    `content_length` is the total byte size, which httpx uses to set the
+    Content-Length header on the multipart request.
+    Returns the full `result` object from Telegram's sendDocument response.
+    """
+
+    async def _do() -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=600.0) as client:
+            resp = await client.post(
+                f"{_bot_base()}/sendDocument",
+                data={"chat_id": _chat_id(), "caption": filename[:1024]},
+                files={
+                    "document": (
+                        filename,
+                        content_iter,
+                        mime or "application/octet-stream",
+                    )
+                 },
+             )
+        resp.raise_for_status()
+        body = resp.json()
+        if not body.get("ok"):
+            raise RuntimeError(f"Telegram sendDocument failed: {body}")
+        return body["result"]
+
+    return await _retry(_do)
+
+
 async def send_document(filename: str, content: bytes, mime: str) -> dict[str, Any]:
     """Upload a file to the configured storage channel.
 

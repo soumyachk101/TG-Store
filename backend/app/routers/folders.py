@@ -23,6 +23,25 @@ from app.models.schemas import (
     FolderUpdate,
 )
 
+async def _rebuild_paths(db: AsyncSession, folder: Folder) -> str:
+    """Recompute the materialized `path` for a folder and all descendants.
+
+    Called after a rename so the breadcrumb / search-path cache stays
+    consistent. Returns the new path for the root folder.
+    """
+    parent_path = (
+        folder.parent.path.rstrip("/") if folder.parent is not None else ""
+    )
+    folder.path = f"{parent_path}/{folder.name}"
+    # Load children explicitly via the session so the recursion runs
+    # inside async context (lazy-loading would raise MissingGreenlet).
+    stmt = select(Folder).where(Folder.parent_id == folder.id)
+    children = (await db.execute(stmt)).scalars().all()
+    for child in children:
+        await _rebuild_paths(db, child)
+    return folder.path
+
+
 router = APIRouter(prefix="/folders", tags=["folders"])
 
 
@@ -92,17 +111,28 @@ async def update_folder(
     db: AsyncSession = Depends(get_db),
     _claims: dict = Depends(require_auth),
 ) -> FolderResponse:
+    from sqlalchemy.orm import joinedload
     row = (
         await db.execute(
-            select(Folder).where(
+            select(Folder)
+            .where(
                 Folder.id == folder_id, Folder.user_id == _claims["sub"]
             )
+            # Eagerly load `parent` so the path rebuild helper can read
+            # `parent.path` without triggering a lazy load inside an
+            # async context (which raises MissingGreenlet on
+            # SQLAlchemy 2.x async sessions).
+            .options(joinedload(Folder.parent))
         )
     ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="Folder not found")
     if payload.name is not None:
         row.name = payload.name
+        # Materialized path of THIS folder and every descendant is now
+        # stale. Rebuild them in-memory and commit so the cache reflects
+        # the rename. (The parent path does not change.)
+        await _rebuild_paths(db, row)
     await db.commit()
     await db.refresh(row)
     return FolderResponse.model_validate(row)

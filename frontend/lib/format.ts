@@ -18,7 +18,9 @@ export function timeAgo(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const diff = Date.now() - then;
-  const sec = Math.round(diff / 1000);
+  // Clamp at 0 — clock skew or future-dated records must not yield
+  // negative strings like "-30s ago".
+  const sec = Math.max(0, Math.round(diff / 1000));
   if (sec < 60) return `${sec}s ago`;
   const min = Math.round(sec / 60);
   if (min < 60) return `${min}m ago`;

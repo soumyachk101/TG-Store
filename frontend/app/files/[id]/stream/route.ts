@@ -26,6 +26,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     forwardHeaders["Range"] = inboundRange;
   }
 
+  // Propagate the inbound abort signal to the upstream fetch so that
+  // a browser navigation, video scrub past EOF, or manual abort
+  // doesn't leave a connection to Telegram open for up to the 300s
+  // FastAPI stream timeout. Using `signal: req.signal` would abort on
+  // the *node* side as well, which is exactly what we want.
   try {
     const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
     const upstream = await fetch(
@@ -33,6 +38,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       {
         headers: forwardHeaders,
         cache: "no-store",
+        signal: req.signal,
       }
     );
 

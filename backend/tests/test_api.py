@@ -104,9 +104,17 @@ async def test_upload_happy_path_persists_metadata():
         "document": {"file_id": "BAADBAADrwADBREAAYag"},
         "message_id": 42,
     }
+
+    async def _fake_stream(filename, content_iter, mime, content_length):
+        # Drain the iterator so the route's `running_total` is updated
+        # (mirroring what real Telegram / httpx does).
+        async for _ in content_iter:
+            pass
+        return fake_telegram_result
+
     with patch(
-        "app.routers.files.telegram.send_document",
-        AsyncMock(return_value=fake_telegram_result),
+        "app.routers.files.telegram.send_document_stream",
+        _fake_stream,
     ):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -169,9 +177,17 @@ async def test_upload_to_folder_happy_path():
         "document": {"file_id": "BAADBAADrwADBREAAYag"},
         "message_id": 42,
     }
+
+    async def _fake_stream(filename, content_iter, mime, content_length):
+        # Drain the iterator so the route's `running_total` is updated
+        # (mirroring what real Telegram / httpx does).
+        async for _ in content_iter:
+            pass
+        return fake_telegram_result
+
     with patch(
-        "app.routers.files.telegram.send_document",
-        AsyncMock(return_value=fake_telegram_result),
+        "app.routers.files.telegram.send_document_stream",
+        _fake_stream,
     ):
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -634,7 +650,7 @@ async def test_delete_folder_with_file_returns_400():
     )
     from sqlalchemy.pool import StaticPool
     from app.models.db import Folder
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -663,7 +679,7 @@ async def test_delete_folder_with_file_returns_400():
             "message_id": 1,
         }
         with patch(
-            "app.routers.files.telegram.send_document",
+            "app.routers.files.telegram.send_document_stream",
             AsyncMock(return_value=fake_tg),
         ):
             async with AsyncClient(
@@ -718,7 +734,6 @@ async def test_stream_route_forwards_range_header(monkeypatch):
     from sqlalchemy.pool import StaticPool
     from app.models.db import File
     import uuid as _u
-    from unittest.mock import AsyncMock
 
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -809,3 +824,101 @@ async def test_stream_route_forwards_range_header(monkeypatch):
 
 
 
+
+
+@pytest.mark.asyncio
+async def test_rename_folder_rebuilds_descendant_paths():
+    """Renaming a folder must rebuild its materialized `path` AND the
+    paths of every descendant folder, otherwise breadcrumbs and any
+    future zip export will show stale paths after a rename.
+    """
+    from app.main import app
+    from app.core import database as dbmod
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(dbmod.Base.metadata.create_all)
+    Session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def override():
+        async with Session() as s:
+            yield s
+
+    app.dependency_overrides[dbmod.get_db] = override
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            tok = (await c.post(
+                "/auth/login", json={"username": "admin", "password": "admin"}
+            )).json()["access_token"]
+            H = {"Authorization": f"Bearer {tok}"}
+
+            # Build A / B (child of A) / C (child of B)
+            a_id = (await c.post("/folders", headers=H, json={"name": "A", "parent_id": None})).json()["id"]
+            b_id = (await c.post("/folders", headers=H, json={"name": "B", "parent_id": a_id})).json()["id"]
+            c_id = (await c.post("/folders", headers=H, json={"name": "C", "parent_id": b_id})).json()["id"]
+
+            # Sanity: paths reflect the original names. The rename
+            # route is the only way to read back a folder's
+            # materialized path because there is no GET-by-id endpoint.
+            # We rename to a sentinel value, capture the path, then
+            # rename back to the original name.
+            names = {a_id: "A", b_id: "B", c_id: "C"}
+
+            async def read_path(fid: str) -> str:
+                original = names[fid]
+                r = await c.patch(
+                    f"/folders/{fid}", headers=H, json={"name": "_SENTINEL_"}
+                )
+                assert r.status_code == 200, r.text
+                captured = r.json()["path"]
+                # Restore the original name so subsequent reads see
+                # the expected state.
+                r2 = await c.patch(
+                    f"/folders/{fid}", headers=H, json={"name": original}
+                )
+                assert r2.status_code == 200, r2.text
+                return captured
+
+            # Baseline: the materialized paths use the original names.
+            assert await read_path(a_id) == "/_SENTINEL_"
+            assert await read_path(b_id) == "/A/_SENTINEL_"
+            assert await read_path(c_id) == "/A/B/_SENTINEL_"
+
+            # Rename A -> AA. B and C paths must be rebuilt transitively.
+            r = await c.patch(f"/folders/{a_id}", headers=H, json={"name": "AA"})
+            assert r.status_code == 200, r.text
+            assert r.json()["path"] == "/AA"
+            assert await read_path(b_id) == "/AA/_SENTINEL_"
+            assert await read_path(c_id) == "/AA/B/_SENTINEL_"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_folder_name_allows_unicode_and_apostrophes():
+    """Folder names should accept Unicode characters and apostrophes, not
+    just [A-Za-z0-9 _.-]. The validator must still block path traversal
+    ('/'), control chars, and leading dots.
+    """
+    from app.models.schemas import FolderCreate
+
+    # Allowed names
+    for n in ["René's files", "été 2024", "中文 folder", "data — 2026", "v1.2.3"]:
+        FolderCreate(name=n)  # must not raise
+
+    # Rejected names
+    for bad in ["../etc", "..", ".", ".hidden", "a/b", "a\\b", "ok\x00bad", "ok\x0a"]:
+        try:
+            FolderCreate(name=bad)
+        except Exception:
+            continue
+        raise AssertionError(f"expected FolderCreate(name={bad!r}) to raise")

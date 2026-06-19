@@ -67,9 +67,11 @@ class FileUpdate(BaseModel):
     def _validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        if not _SAFE_NAME_RE.match(v):
+        if v.startswith("."):
+            raise ValueError("name must not start with '.'")
+        if _NAME_FORBIDDEN_RE.search(v):
             raise ValueError(
-                "name must contain only letters, digits, spaces, '.', '-', '_'"
+                "name must not contain path separators or control characters"
             )
         return v
 
@@ -92,11 +94,16 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 # --- Folders ---
 
-# Folder names are embedded into a materialized `path` and surfaced in API
-# responses / future zip-export filenames. Restrict the character set so a
-# user cannot inject `/` (path traversal), control chars (header injection),
-# or names like `.` / `..` (filesystem escape).
-_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9 _.\-]+$")
+# Folder / file names are embedded into a materialized `path`, returned
+# in API responses, and (in future) used in zip-export filenames. We
+# block the *dangerous* characters — `/` and `\` (path traversal),
+# control characters (header injection), and leading/trailing dots and
+# the special names `.` / `..` (filesystem escape). Everything else,
+# including Unicode (é, ñ, 中, emoji, etc.) and apostrophes, is allowed.
+#
+# Reject: any character that is a control char (< 0x20) or is one of
+# the path-separator / filesystem-special characters.
+_NAME_FORBIDDEN_RE = re.compile(r"[\x00-\x1f\x7f/\\]")
 
 
 class FolderCreate(BaseModel):
@@ -106,10 +113,17 @@ class FolderCreate(BaseModel):
     @field_validator("name")
     @classmethod
     def _validate_name(cls, v: str) -> str:
-        v = v.strip()
-        if not _SAFE_NAME_RE.match(v) or v in {".", ".."}:
+        # Check forbidden chars on the *original* input so a control
+        # character in the middle of a name is rejected, not silently
+        # removed by strip().
+        if _NAME_FORBIDDEN_RE.search(v):
             raise ValueError(
-                "name must contain only letters, digits, spaces, '.', '-', '_'"
+                "name must not contain path separators or control characters"
+            )
+        v = v.strip()
+        if not v or v in {".", ".."} or v.startswith("."):
+            raise ValueError(
+                "name must not be empty, must not start with '.', and must not be '.' or '..'"
             )
         return v
 
@@ -122,10 +136,14 @@ class FolderUpdate(BaseModel):
     def _validate_name(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
-        v = v.strip()
-        if not _SAFE_NAME_RE.match(v) or v in {".", ".."}:
+        if _NAME_FORBIDDEN_RE.search(v):
             raise ValueError(
-                "name must contain only letters, digits, spaces, '.', '-', '_'"
+                "name must not contain path separators or control characters"
+            )
+        v = v.strip()
+        if not v or v in {".", ".."} or v.startswith("."):
+            raise ValueError(
+                "name must not be empty, must not start with '.', and must not be '.' or '..'"
             )
         return v
 

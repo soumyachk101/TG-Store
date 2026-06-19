@@ -44,6 +44,10 @@ from app.models.schemas import (
 from app.services import telegram
 from app.utils.helpers import clamp, group_for_mime
 
+class _UploadTooLarge(Exception):
+    """Sentinel raised by the streaming iterator when the cap is exceeded."""
+
+
 router = APIRouter(prefix="/files", tags=["files"])
 settings = get_settings()
 
@@ -67,8 +71,10 @@ async def upload_file(
 ) -> FileResponse:
     """Upload a file to Telegram, persist metadata.
 
-    Enforces 2 GB limit BEFORE reading the full body into memory
-    (per AI instructions — fail fast, never let Telegram see an oversize file).
+    Streams the body to Telegram in 1 MB chunks without buffering the
+    full file in process memory. Enforces the 2 GB cap BEFORE streaming
+    (declared size) and again AS we stream (so an attacker cannot bypass
+    the limit by lying about Content-Length).
     """
     # --- Size cap (Telegram limit is 2 GB) ---
     # UploadFile.size is set by Starlette from Content-Length if available.
@@ -79,33 +85,47 @@ async def upload_file(
             detail=f"File exceeds {settings.max_upload_bytes} byte limit",
         )
 
-    chunks = []
-    total_size = 0
-    while True:
-        chunk = await file.read(1024 * 1024)
-        if not chunk:
-            break
-        total_size += len(chunk)
-        if total_size > settings.max_upload_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"File exceeds {settings.max_upload_bytes} byte limit",
-            )
-        chunks.append(chunk)
-    content = b"".join(chunks)
-
     mime_type = file.content_type or "application/octet-stream"
     is_safe = mime_type.startswith(("image/", "video/", "audio/")) or mime_type == "application/pdf"
     if not is_safe:
         mime_type = "application/octet-stream"
 
+    # --- Streaming iterator that enforces the cap as bytes flow ---
+    # httpx will keep this iterator open for the duration of the multipart
+    # request, so we MUST enforce the cap *during* iteration (not just
+    # before opening the connection).
+    running_total = 0
+
+    async def _chunks():
+        nonlocal running_total
+        while True:
+            chunk = await file.read(1024 * 1024)
+            if not chunk:
+                return
+            running_total += len(chunk)
+            if running_total > settings.max_upload_bytes:
+                # Raise to abort the upstream request immediately. The
+                # caller wraps this in a try/except and returns 413.
+                raise _UploadTooLarge()
+            yield chunk
+
     # --- Send to Telegram ---
     original_name = file.filename or "unnamed"
+    # We pass `declared` (or 0) as content_length so httpx sets the
+    # Content-Length header up front. The iterator-level cap above is the
+    # authoritative check; Telegram will 413/timeout if we lie.
+    content_length = declared or 0
     try:
-        result = await telegram.send_document(
+        result = await telegram.send_document_stream(
             filename=original_name,
-            content=content,
+            content_iter=_chunks(),
             mime=mime_type,
+            content_length=content_length,
+        )
+    except _UploadTooLarge:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"File exceeds {settings.max_upload_bytes} byte limit",
         )
     except Exception as exc:
         # Do not echo Telegram error details (may include token leakage)
@@ -142,7 +162,7 @@ async def upload_file(
         name=original_name,
         original_name=original_name,
         mime_type=mime_type,
-        size_bytes=len(content),
+        size_bytes=running_total,
         folder_id=parsed_folder_id,
         tg_file_id=tg_file_id,
         tg_message_id=tg_message_id,
@@ -311,14 +331,21 @@ async def stream_file(
                 async for chunk in resp.aiter_bytes(STREAM_CHUNK):
                     yield chunk
 
-    filename = row.name
-    # RFC 6266: percent-encode the filename so a user-supplied name containing
-    # `"`, CR, LF, or non-ASCII cannot break out of the quoted attribute or
-    # inject extra headers.
-    safe_filename = quote(filename or "download", safe="")
+    filename = row.name or "download"
+    # RFC 6266 / RFC 5987:
+    # - `filename=` is a quoted-string in the legacy ISO-8859-1 form.
+    #   We percent-encode the value and wrap it in double-quotes so a
+    #   user-supplied name containing `"`, `\`, CR, LF, or non-ASCII
+    #   cannot break out of the quoted attribute or inject extra
+    #   response headers.
+    # - `filename*=UTF-8''<percent-encoded>` is the RFC 5987 form for
+    #   any character, including Unicode.
+    # Both are emitted for max compatibility (browsers prefer filename*
+    # when both are present).
+    safe_filename = quote(filename, safe="")
     headers = {
         "Content-Disposition": (
-            f"attachment; filename={safe_filename}; "
+            f'attachment; filename="{safe_filename}"; '
             f"filename*=UTF-8''{safe_filename}"
         ),
         "Content-Type": row.mime_type or "application/octet-stream",
