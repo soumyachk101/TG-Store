@@ -115,9 +115,20 @@ export async function moveFile(id: string, folderId: string | null): Promise<Fil
   return r.data;
 }
 
-/** Returns a URL that proxies file bytes through the Next.js route handler. */
-export function streamUrl(id: string): string {
-  return `/files/${id}/stream`;
+/**
+ * Returns a URL that proxies file bytes through the Next.js route
+ * handler. The default URL forces a `Content-Disposition: attachment`
+ * download — used by the Download button.
+ *
+ * For inline previews (PDFs, images, videos inside an `<iframe>` or
+ * `<img>` / `<video>` element), pass `inline: true` to append
+ * `?inline=1`. The proxy forwards that flag to the backend, which
+ * then sets `Content-Disposition: inline` so the browser renders the
+ * file in place instead of triggering a download.
+ */
+export function streamUrl(id: string, options: { inline?: boolean } = {}): string {
+  const q = options.inline ? "?inline=1" : "";
+  return `/files/${id}/stream${q}`;
 }
 
 // --- Folders ---

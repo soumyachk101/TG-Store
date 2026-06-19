@@ -63,9 +63,29 @@ const nextConfig = {
       { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
     ];
 
+    // CSP for routes that may be framed by the same origin (PDF /
+    // image / video preview iframes). Drops frame-ancestors to
+    // 'self' so the dashboard's <iframe> can embed the stream.
+    const cspFramable = cspValue.replace(
+      "frame-ancestors \'none\'",
+      "frame-ancestors \'self\'"
+    );
+
     return [
-      // /login first (more specific). CSP still enforced; only COOP
-      // is relaxed so Firebase can poll popup.closed.
+      // Stream proxy: relaxed X-Frame-Options + frame-ancestors so
+      // the dashboard's <iframe> can embed PDFs / images / videos.
+      // MUST come before the catch-all.
+      {
+        source: "/files/:id/stream",
+        headers: [
+          ...baseHeaders("same-origin-allow-popups").map((h) =>
+            h.key === "X-Frame-Options" ? { ...h, value: "SAMEORIGIN" } : h
+          ),
+          { key: "Content-Security-Policy", value: cspFramable },
+        ],
+      },
+      // /login (more specific). CSP still enforced; only COOP is
+      // relaxed so Firebase can poll popup.closed.
       {
         source: "/login",
         headers: [

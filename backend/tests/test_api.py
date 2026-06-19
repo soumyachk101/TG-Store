@@ -982,3 +982,111 @@ async def test_send_document_stream_writes_via_spooled_file(monkeypatch):
     assert captured["has_read"] is True, "handle must be a sync file-like"
     assert captured["content"] == b"hello world"
     assert captured["content_length"] == 11
+
+
+@pytest.mark.asyncio
+async def test_stream_inline_flag_sets_inline_disposition(monkeypatch):
+    """The /files/{id}/stream endpoint must set Content-Disposition:
+    inline when called with `?inline=1` (used by the PDF / image /
+    video preview iframes) and the default `attachment` disposition
+    when not. The default is critical for the Download button.
+
+    We don't exercise Telegram here — we monkeypatch get_download_url
+    and replace the upstream httpx call to return a fixed body.
+    """
+    from app.main import app
+    from app.core import database as dbmod
+    from app.routers import files as files_router
+    from sqlalchemy.ext.asyncio import (
+        AsyncSession,
+        async_sessionmaker,
+        create_async_engine,
+    )
+    from sqlalchemy.pool import StaticPool
+    from app.models.db import File
+    import uuid as _u
+    from unittest.mock import AsyncMock
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    async with engine.begin() as conn:
+        await conn.run_sync(dbmod.Base.metadata.create_all)
+    Session = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
+
+    file_id = _u.uuid4()
+    async with Session() as s:
+        s.add(File(
+            id=file_id,
+            name="doc.pdf",
+            original_name="doc.pdf",
+            mime_type="application/pdf",
+            size_bytes=4,
+            tg_file_id="ABC",
+            tg_message_id=1,
+            user_id="admin",
+        ))
+        await s.commit()
+
+    async def override():
+        async with Session() as s:
+            yield s
+
+    app.dependency_overrides[dbmod.get_db] = override
+    monkeypatch.setattr(
+        files_router.telegram,
+        "get_download_url",
+        AsyncMock(return_value="https://api.telegram.org/file/botT/doc"),
+    )
+
+    # Bypass the actual upstream HTTP call: replace the route's inner
+    # _iter with a fixed payload. We do this by patching the httpx
+    # AsyncClient.stream coroutine.
+    import httpx
+
+    class _FakeResponse:
+        status_code = 200
+        def raise_for_status(self):
+            return None
+        async def aiter_bytes(self, n):
+            yield b"PDF!"
+
+    class _Ctx:
+        async def __aenter__(self_inner):
+            return _FakeResponse()
+        async def __aexit__(self_inner, *a):
+            return False
+
+    def _fake_stream(self, method, url, **kw):
+        return _Ctx()
+
+    monkeypatch.setattr(httpx.AsyncClient, "stream", _fake_stream)
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+            tok = (await c.post(
+                "/auth/login", json={"username": "admin", "password": "admin"}
+            )).json()["access_token"]
+            H = {"Authorization": f"Bearer {tok}"}
+
+            # Default → attachment
+            r = await c.get(f"/files/{file_id}/stream", headers=H)
+            assert r.status_code == 200, r.text
+            disp = r.headers.get("content-disposition", "")
+            assert disp.startswith("attachment;"), f"expected attachment, got {disp!r}"
+
+            # ?inline=1 → inline (this is what the PDF iframe uses)
+            r = await c.get(f"/files/{file_id}/stream?inline=1", headers=H)
+            assert r.status_code == 200, r.text
+            disp = r.headers.get("content-disposition", "")
+            assert disp.startswith("inline;"), f"expected inline, got {disp!r}"
+
+            # ?inline=false (or any non-truthy value) → attachment
+            r = await c.get(f"/files/{file_id}/stream?inline=0", headers=H)
+            assert r.status_code == 200, r.text
+            disp = r.headers.get("content-disposition", "")
+            assert disp.startswith("attachment;"), f"expected attachment, got {disp!r}"
+    finally:
+        app.dependency_overrides.clear()

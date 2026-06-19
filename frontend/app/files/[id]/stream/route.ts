@@ -26,6 +26,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     forwardHeaders["Range"] = inboundRange;
   }
 
+  // Pass the `?inline=1` flag through to the backend so PDFs / images
+  // / videos rendered inside the preview iframe get
+  // Content-Disposition: inline (and so render in place instead of
+  // triggering a download). Default is `attachment`, used by the
+  // Download button.
+  const url = new URL(req.url);
+  const inlineFlag = url.searchParams.get("inline");
+  const upstreamQuery = inlineFlag ? "?inline=1" : "";
+
   // Propagate the inbound abort signal to the upstream fetch so that
   // a browser navigation, video scrub past EOF, or manual abort
   // doesn't leave a connection to Telegram open for up to the 300s
@@ -34,7 +43,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   try {
     const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
     const upstream = await fetch(
-      `${apiBase}/files/${id}/stream`,
+      `${apiBase}/files/${id}/stream${upstreamQuery}`,
       {
         headers: forwardHeaders,
         cache: "no-store",

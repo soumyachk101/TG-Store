@@ -305,11 +305,25 @@ async def get_file(
 @router.get("/{file_id}/stream")
 async def stream_file(
     file_id: uuid.UUID,
+    inline: bool = Query(
+        default=False,
+        description=(
+            "If true, set Content-Disposition: inline so the browser "
+            "renders the file in-place (used by the PDF / image / video "
+            "preview iframe). Default is `attachment` which forces a "
+            "download — used by the Download button."
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     _claims: dict = Depends(require_auth),
 ):
     """Proxy the file bytes through FastAPI. The browser never sees the
     Telegram URL or bot token.
+
+    The `inline` query flag switches Content-Disposition from
+    `attachment` (the download default) to `inline` (used by preview
+    iframes). Without this, PDFs / images / videos loaded in an
+    `<iframe>` are forced to download instead of rendering.
     """
     row = (
         await db.execute(
@@ -343,9 +357,10 @@ async def stream_file(
     # Both are emitted for max compatibility (browsers prefer filename*
     # when both are present).
     safe_filename = quote(filename, safe="")
+    disposition_kind = "inline" if inline else "attachment"
     headers = {
         "Content-Disposition": (
-            f'attachment; filename="{safe_filename}"; '
+            f'{disposition_kind}; filename="{safe_filename}"; '
             f"filename*=UTF-8''{safe_filename}"
         ),
         "Content-Type": row.mime_type or "application/octet-stream",

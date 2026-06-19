@@ -62,12 +62,19 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
     }
   };
 
-  const directUrl = streamUrl(file.id);
+  // URLs:
+  // - `previewUrl` (inline): used by <img>, <video>, <audio>, and the
+  //   PDF <iframe> so the backend sets Content-Disposition: inline and
+  //   the browser renders the file in place.
+  // - `downloadUrl` (attachment): used by the Download button so the
+  //   browser saves the file with the original filename.
+  const previewUrl = streamUrl(file.id, { inline: true });
+  const downloadUrl = streamUrl(file.id);
 
   const handleDownload = () => {
-    if (!directUrl) return;
+    if (!downloadUrl) return;
     const a = document.createElement("a");
-    a.href = directUrl;
+    a.href = downloadUrl;
     a.download = file.name;
     document.body.appendChild(a);
     a.click();
@@ -101,10 +108,10 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
           </div>
         )}
 
-        {isImage && directUrl && (
+        {isImage && previewUrl && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={directUrl}
+            src={previewUrl}
             alt={file.name}
             onLoad={() => setLoading(false)}
             onError={() => {
@@ -115,9 +122,9 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
           />
         )}
 
-        {isVideo && directUrl && (
+        {isVideo && previewUrl && (
           <video
-            src={directUrl}
+            src={previewUrl}
             controls
             autoPlay
             onCanPlay={() => setLoading(false)}
@@ -129,7 +136,7 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
           />
         )}
 
-        {isAudio && directUrl && (
+        {isAudio && previewUrl && (
           <div className="rounded-xl bg-bg-raised p-8 border border-line shadow-2xl flex flex-col items-center gap-4 w-full max-w-md">
             <span className="h-16 w-16 rounded-full bg-accent/10 text-accent flex items-center justify-center text-xl font-bold uppercase">
               {mime.split("/").pop()?.slice(0, 3)}
@@ -139,7 +146,7 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
               <p className="text-xs text-ink-muted mt-1">{formatBytes(file.size_bytes)}</p>
             </div>
             <audio
-              src={directUrl}
+              src={previewUrl}
               controls
               autoPlay
               onCanPlay={() => setLoading(false)}
@@ -152,9 +159,9 @@ export function PreviewModal({ isOpen, onClose, files, currentIndex, onNavigate 
           </div>
         )}
 
-        {isPdf && directUrl && (
+        {isPdf && previewUrl && (
           <iframe
-            src={`${directUrl}#toolbar=0`}
+            src={`${previewUrl}#toolbar=0`}
             title={file.name}
             onLoad={() => setLoading(false)}
             className="h-[80vh] w-full max-w-4xl rounded border border-line bg-white shadow-2xl"
