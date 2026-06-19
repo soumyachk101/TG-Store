@@ -97,34 +97,52 @@ async def send_document_stream(
     mime: str,
     content_length: int,
 ) -> dict[str, Any]:
-    """Stream a file upload to Telegram without buffering in memory.
+    """Stream a file upload to Telegram without buffering in RAM.
 
     `content_iter` is an async iterator yielding bytes chunks.
-    `content_length` is the total byte size, which httpx uses to set the
-    Content-Length header on the multipart request.
-    Returns the full `result` object from Telegram's sendDocument response.
+    `content_length` is the total byte size.
+
+    httpx's `files=` multipart parameter does not accept async
+    iterators — it requires synchronous file-like objects. To keep
+    memory bounded we drain the async iterator into a SpooledTemporaryFile
+    (in-RAM up to ~64 MB, then rolled over to disk), then hand the
+    sync file handle to httpx. For 2 GB uploads this caps resident
+    memory at ~64 MB instead of pinning the full body.
     """
 
-    async def _do() -> dict[str, Any]:
-        async with httpx.AsyncClient(timeout=600.0) as client:
-            resp = await client.post(
-                f"{_bot_base()}/sendDocument",
-                data={"chat_id": _chat_id(), "caption": filename[:1024]},
-                files={
-                    "document": (
-                        filename,
-                        content_iter,
-                        mime or "application/octet-stream",
-                    )
-                 },
-             )
-        resp.raise_for_status()
-        body = resp.json()
-        if not body.get("ok"):
-            raise RuntimeError(f"Telegram sendDocument failed: {body}")
-        return body["result"]
+    import tempfile
 
-    return await _retry(_do)
+    spooled = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
+    try:
+        async for chunk in content_iter:
+            spooled.write(chunk)
+        # Reset to the start so httpx reads the bytes we just wrote.
+        # (The actual byte count is already known to the caller via
+        # `running_total` in the route; we don't need it here.)
+        spooled.seek(0)
+
+        async def _do() -> dict[str, Any]:
+            async with httpx.AsyncClient(timeout=600.0) as client:
+                resp = await client.post(
+                    f"{_bot_base()}/sendDocument",
+                    data={"chat_id": _chat_id(), "caption": filename[:1024]},
+                    files={
+                        "document": (
+                            filename,
+                            spooled,
+                            mime or "application/octet-stream",
+                        )
+                    },
+                )
+            resp.raise_for_status()
+            body = resp.json()
+            if not body.get("ok"):
+                raise RuntimeError(f"Telegram sendDocument failed: {body}")
+            return body["result"]
+
+        return await _retry(_do)
+    finally:
+        spooled.close()
 
 
 async def send_document(filename: str, content: bytes, mime: str) -> dict[str, Any]:

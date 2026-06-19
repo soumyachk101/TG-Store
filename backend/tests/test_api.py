@@ -922,3 +922,63 @@ def test_folder_name_allows_unicode_and_apostrophes():
         except Exception:
             continue
         raise AssertionError(f"expected FolderCreate(name={bad!r}) to raise")
+
+
+@pytest.mark.asyncio
+async def test_send_document_stream_writes_via_spooled_file(monkeypatch):
+    """The streaming upload path must drain the async iterator into a
+    SpooledTemporaryFile and hand a sync file-like object to httpx, NOT
+    pass the async generator directly. The previous implementation did
+    the latter, which httpx silently mis-encoded, leading to a 502 on
+    every upload in production.
+
+    We intercept the actual file handle that ends up in the multipart
+    `files=` argument and assert it's a real readable file with the
+    expected content.
+    """
+    from app.services import telegram
+
+    captured = {}
+
+    class _FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *a):
+            return False
+        async def post(self, url, data=None, files=None, **kw):
+            # Capture the file handle passed to httpx and check its
+            # content + that it is a real sync file object.
+            doc = files["document"]
+            handle = doc[1]
+            captured["has_read"] = hasattr(handle, "read")
+            captured["has_fileno"] = hasattr(handle, "fileno")
+            handle.seek(0)
+            captured["content"] = handle.read()
+            captured["content_length"] = len(captured["content"])
+
+            class _Resp:
+                status_code = 200
+                def raise_for_status(self):
+                    return None
+                def json(self):
+                    return {"ok": True, "result": {"document": {"file_id": "X"}, "message_id": 1}}
+            return _Resp()
+
+    monkeypatch.setattr(telegram.httpx, "AsyncClient", _FakeClient)
+
+    async def _aiter():
+        yield b"hello "
+        yield b"world"
+
+    result = await telegram.send_document_stream(
+        filename="greeting.txt",
+        content_iter=_aiter(),
+        mime="text/plain",
+        content_length=11,
+    )
+    assert result["document"]["file_id"] == "X"
+    assert captured["has_read"] is True, "handle must be a sync file-like"
+    assert captured["content"] == b"hello world"
+    assert captured["content_length"] == 11
