@@ -77,7 +77,6 @@ export async function uploadFile({ file, folderId, onProgress }: UploadArgs): Pr
   form.append("file", file);
   if (folderId) form.append("folder_id", folderId);
   const config: AxiosRequestConfig = {
-    headers: { "Content-Type": "multipart/form-data" },
     onUploadProgress: (e: AxiosProgressEvent) => {
       if (onProgress && e.total) {
         onProgress(Math.round((e.loaded * 100) / e.total));
